@@ -1,3 +1,4 @@
+#include "ConvertString.h"
 #include <windows.h>
 #include <string>
 
