@@ -1,5 +1,10 @@
 #include <Windows.h>
 #include <cstdint>
+#include <string>
+
+void Log(const std::string& message) {
+	OutputDebugStringA(message.c_str());
+}
 
 // ウィンドウプロシージャ
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
