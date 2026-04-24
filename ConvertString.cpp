@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <string>
+#include "ConvertString.h"
 
 std::wstring ConvertString(const std::string& str) {
     if (str.empty()) {

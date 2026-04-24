@@ -2,9 +2,14 @@
 #include <cstdint>
 #include <string>
 #include <format>
+#include "ConvertString.h"
 
 void Log(const std::string& message) {
 	OutputDebugStringA(message.c_str());
+}
+
+void Log(const std::wstring& message) {
+	Log(ConvertString(message));
 }
 
 // ウィンドウプロシージャ
