@@ -38,7 +38,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 
 static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 	// 中身はこれから埋める
-	return EXCEPTION_EXECUTE_HANDLER;
 
 	// 時刻を取得して、時刻を名前に入れたファイルを作成。Dumpsディレクトリ以下に出力
 	SYSTEMTIME time;
@@ -64,17 +63,13 @@ static LONG WINAPI ExportDump(EXCEPTION_POINTERS* exception) {
 
 }
 
-uint32_t* p = nullptr;
-*p = 100;
+
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 誰も捕捉しなかった場合に(Unhandled),補足する関数を登録
 	// main関数はじまってすぐに登録するとよい
 	SetUnhandledExceptionFilter(ExportDump);
-
-	
-	
 
 	// ログのディレクトリを用意
 	std::filesystem::create_directory("logs");
@@ -195,6 +190,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(device != nullptr);
 	Log(logStream,"Complete create D3D12Device!!!\n");// 初期化完了のログをだす
 
+	uint32_t* p = nullptr;
+	*p = 100;
+
 	MSG msg{};
 	// ウィンドウの×ボタンが押されるまでループ
 	while (msg.message != WM_QUIT) {
@@ -209,7 +207,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	}
 
 	// 出力ウィンドウへの文字出力
-	OutputDebugStringA("Hello,DirectX!\n");
+	Log(logStream, std::format("Hello,DirectX!\n"));
 
 	return 0;
 }
