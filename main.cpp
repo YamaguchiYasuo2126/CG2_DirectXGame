@@ -9,10 +9,11 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <cassert>
+#include <dxgidebug.h>
 
 #pragma comment(lib, "d3d12.lib")
 #pragma comment(lib, "dxgi.lib")
-
+#pragma comment(lib, "dxguid.lib")
 
 void Log(std::ostream& os, const std::string& message) {
 	os << message << std::endl;
@@ -90,7 +91,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		wc.hInstance,			// インスタンスハンドル
 		nullptr);				// オプション
 
-	#ifdef _DEBUG
+#ifdef _DEBUG
 	ID3D12Debug1* debugController = nullptr;
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
 		// デバッグレイヤーを有効化する
@@ -98,7 +99,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 更にGPU側でもチェックを行うようにする
 		debugController->SetEnableGPUBasedValidation(TRUE);
 	}
-	#endif
+#endif
 
 
 	// ウィンドウを表示する
@@ -167,7 +168,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(device != nullptr);
 	Log(logStream, "Complete create D3D12Device!!!\n");// 初期化完了のログをだす
 
-	#ifdef _DEBUG
+#ifdef _DEBUG
 	ID3D12InfoQueue* infoQueue = nullptr;
 	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
 	{
@@ -183,7 +184,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// https://stackoverflow.com/questions/69805245/directx-12-application-is-crashing-in-windows-11
 			D3D12_MESSAGE_ID_RESOURCE_BARRIER_MISMATCHING_COMMAND_LIST_TYPE
 		};
-		
+
 		// 抑制するレベル
 		D3D12_MESSAGE_SEVERITY severities[] = { D3D12_MESSAGE_SEVERITY_INFO };
 		D3D12_INFO_QUEUE_FILTER filter{};
@@ -196,7 +197,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		// 解放
 		infoQueue->Release();
 	}
-	#endif
+#endif
 
 
 	// コマンドキューを生成する
@@ -328,7 +329,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	uint64_t fenceValue = 0;
 	hr = device->CreateFence(fenceValue, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence));
 	assert(SUCCEEDED(hr));
-	
+
 	// Fenceのsignalを待つためのイベントを作成する
 	HANDLE fenceEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
 	assert(fenceEvent != nullptr);
@@ -368,6 +369,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 出力ウィンドウへの文字出力
 	Log(logStream, std::format("Hello,DirectX!\n"));
+
+	CloseHandle(fenceEvent);
+	fence->Release();
+	rtvDescriptorHeap->Release();
+	swapChainResources[0]->Release();
+	swapChainResources[1]->Release();
+	swapChain->Release();
+	commandList->Release();
+	commandAllocator->Release();
+	commandQueue->Release();
+	device->Release();
+	useAdapter->Release();
+	dxgiFactory->Release();
+	#ifdef _DEBUG
+		debugController->Release();
+	#endif
+	CloseWindow(hwnd);
+
+	// リソースリークチェック
+	IDXGIDebug1* debug;
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
+		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+		debug->Release();
+	}
 
 	return 0;
 }
