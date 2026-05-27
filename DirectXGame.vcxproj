@@ -13,9 +13,14 @@
   <ItemGroup>
     <ClCompile Include="ConvertString.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MatrixUtility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConvertString.h" />
+    <ClInclude Include="Matrix4x4.h" />
+    <ClInclude Include="MatrixUtility.h" />
+    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Vector4.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.PS.hlsl">
