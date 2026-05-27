@@ -121,6 +121,38 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
+// BufferResourceを作る関数
+ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) 
+{
+	// 頂点リソース用のヒープの設定
+	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
+	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD; // UploadHeapを使う
+
+	// リソースの設定
+	D3D12_RESOURCE_DESC resourceDesc{};
+	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+	resourceDesc.Width = sizeInBytes; // 引数で指定されたサイズ
+	resourceDesc.Height = 1;
+	resourceDesc.DepthOrArraySize = 1;
+	resourceDesc.MipLevels = 1;
+	resourceDesc.SampleDesc.Count = 1;
+	resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+
+	// 実際にリソースを作る
+	ID3D12Resource* resource = nullptr;
+	HRESULT hr = device->CreateCommittedResource(
+		&uploadHeapProperties,
+		D3D12_HEAP_FLAG_NONE,
+		&resourceDesc,
+		D3D12_RESOURCE_STATE_GENERIC_READ,
+		nullptr,
+		IID_PPV_ARGS(&resource)
+	);
+	assert(SUCCEEDED(hr));
+
+	return resource;
+}
+
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
@@ -465,25 +497,6 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
-	// 頂点リソース用のヒープの設定
-	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;// UploadHeapを使う
-	// 頂点リソースの設定
-	D3D12_RESOURCE_DESC vertexResourceDesc{};
-	// バッファリソース。テクスチャの場合はまた別の設定をする
-	vertexResourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	vertexResourceDesc.Width = sizeof(Vector4) * 3;// リソースのサイズ。今回はVector4を3頂点分
-	// バッファの場合はこれらは1にする決まり
-	vertexResourceDesc.Height = 1;
-	vertexResourceDesc.DepthOrArraySize = 1;
-	vertexResourceDesc.MipLevels = 1;
-	vertexResourceDesc.SampleDesc.Count = 1;
-	// バッファの場合はこれにする決まり
-	vertexResourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-	
-	// BufferResourceを作る関数
-	ID3D12Resource* CreateBufferResource(ID3D12Device* device, size_t sizeInBytes);
-
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
 	// マテリアルにデータを書き込む
@@ -493,12 +506,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 今回は赤を書き込んでみる
 	*materialData = Vector4(1.0f, 0.0f, 0.0f, 1.0f);
 
-	// 実際に頂点リソースを作る
+	// 実際に頂点リソースを作る(共通化した関数を呼び出す)
 	ID3D12Resource* vertexResource = CreateBufferResource(device, sizeof(Vector4) * 3);
-	hr = device->CreateCommittedResource(&uploadHeapProperties, D3D12_HEAP_FLAG_NONE,
-	&vertexResourceDesc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-	IID_PPV_ARGS(&vertexResource));
-	assert(SUCCEEDED(hr));
 
 	// 頂点バッファビューを作成する
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
