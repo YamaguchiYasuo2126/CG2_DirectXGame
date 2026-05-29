@@ -15,6 +15,7 @@
 #include "Vector3.h"
 #include "Vector4.h"
 #include "MatrixUtility.h"
+#include "externals/DirectXTex/DirectXTex.h"
 
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
@@ -110,8 +111,6 @@ IDxcBlob* CompileShader(
 	// 実行中のバイナリを返却
 	return shaderBlob;
 
-
-
 }
 
 // ウィンドウプロシージャ
@@ -180,8 +179,20 @@ ID3D12DescriptorHeap* CreateDescriptorHeap(ID3D12Device* device, D3D12_DESCRIPTO
 	return descriptorHeap;
 }
 
+DirectX::ScratchImage LoadTexture(const std::string& filePath) {
+	
+	// テクスチャファイルを読んでプログラムで扱えるようにする
+	DirectX::ScratchImage image{};
+	std::wstring filePathW = ConvertString(filePath);
+	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::)
+
+}
+
+
 // windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
+
+	CoInitializeEx(0, COINIT_MULTITHREADED);
 
 	// ログのディレクトリを用意
 	std::filesystem::create_directory("logs");
@@ -804,6 +815,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 		debug->Release();
 	}
+
+	CoUninitialize();
 
 	return 0;
 }
