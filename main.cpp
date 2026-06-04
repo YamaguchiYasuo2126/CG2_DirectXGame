@@ -685,19 +685,66 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	assert(SUCCEEDED(hr));
 
 	// WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
-	ID3D12Resource* wvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	ID3D12Resource* wvpResourceA = CreateBufferResource(device, sizeof(Matrix4x4));
 	// データを書き込む
-	Matrix4x4* wvpData = nullptr;
+	Matrix4x4* wvpDataA = nullptr;
 	// 書き込むためにアドレスを取得
-	wvpResource->Map(0, nullptr, reinterpret_cast<void**>(&wvpData));
+	wvpResourceA->Map(0, nullptr, reinterpret_cast<void**>(&wvpDataA));
 	// 単位行列を書き込んでおく
-	*wvpData = MatrixUtility::MakeIdentity4x4();
+	*wvpDataA = MatrixUtility::MakeIdentity4x4();
 
-	// Textureを読んで転送する
-	DirectX::ScratchImage mipImages = LoadTexture("resources/uvChecker.png");
-	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-	ID3D12Resource* textureResource = CreateTextureResource(device, metadata);
-	UploadTextureData(textureResource, mipImages);
+	// WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
+	ID3D12Resource* wvpResourceB = CreateBufferResource(device, sizeof(Matrix4x4));
+	// データを書き込む
+	Matrix4x4* wvpDataB = nullptr;
+	// 書き込むためにアドレスを取得
+	wvpResourceB->Map(0, nullptr, reinterpret_cast<void**>(&wvpDataB));
+	// 単位行列を書き込んでおく
+	*wvpDataB = MatrixUtility::MakeIdentity4x4();
+
+	// 複数テクスチャの管理
+	const size_t kNumTextures = 3; // 切り替えたいテクスチャの総数
+	std::string textureFilePaths[kNumTextures] = {
+		"resources/uvChecker.png",
+		"resources/bossChameleon.png",
+		"resources/golemRushLeft.png"
+	};
+
+	ID3D12Resource* textureResources[kNumTextures] = { nullptr };
+	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandlesCPU[kNumTextures] = {};
+	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandlesGPU[kNumTextures] = {};
+
+	// ディスクリプタ1つ分のサイズを取得
+	UINT descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+	for (size_t i = 0; i < kNumTextures; ++i) {
+		// テクスチャの読み込みとリソース作成
+		DirectX::ScratchImage mipImages = LoadTexture(textureFilePaths[i]);
+		const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+		textureResources[i] = CreateTextureResource(device, metadata);
+		UploadTextureData(textureResources[i], mipImages);
+
+		// metaDataを基にSRVの設定
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Format = metadata.format;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+
+		// ハンドルの計算 (先頭はImGuiが使っているのでその次を使う)
+		textureSrvHandlesCPU[i] = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
+		textureSrvHandlesCPU[i].ptr += descriptorSize * (i + 1);
+
+		textureSrvHandlesGPU[i] = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
+		textureSrvHandlesGPU[i].ptr += descriptorSize * (i + 1);
+
+		// SRVの生成
+		device->CreateShaderResourceView(textureResources[i], &srvDesc, textureSrvHandlesCPU[i]);
+	}
+
+	// オブジェクトごとに選択されているテクスチャのインデックスを保持する変数
+	int selectTextureIndexA = 0;
+	int selectTextureIndexB = 0;
 
 	// マテリアル用のリソースを作る。今回はcolor1つ分のサイズを用意する
 	ID3D12Resource* materialResource = CreateBufferResource(device, sizeof(Vector4));
@@ -728,40 +775,24 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// 書き込むためのアドレスを取得
 	vertexResource->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 	// 左下
-	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
+	vertexData[0].position = { -0.8f, -0.5f, -1.0f, 1.0f };
 	vertexData[0].texcoord = { 0.0f, 1.0f };
 	// 上
 	vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
 	vertexData[1].texcoord = { 0.5f, 0.0f };
 	// 右下
-	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
+	vertexData[2].position = { 0.8f, -0.5f, 1.0f, 1.0f };
 	vertexData[2].texcoord = { 1.0f, 1.0f };
 
 	// 左下2
-	vertexData[3].position = { -0.5f, -0.5f, 0.5f, 1.0f };
+	vertexData[3].position = { -0.5f, -0.8f, 1.0f, 1.0f };
 	vertexData[3].texcoord = { 0.0f, 1.0f };
 	// 上2
-	vertexData[4].position = { 0.0f, 0.0f, 0.0f, 1.0f };
+	vertexData[4].position = { 0.0f, 0.8f, 0.0f, 1.0f };
 	vertexData[4].texcoord = { 0.5f, 0.0f };
 	// 右下2
-	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
+	vertexData[5].position = { 0.5f, -0.8f, -1.0f, 1.0f };
 	vertexData[5].texcoord = { 1.0f, 1.0f };
-
-	// metaDataを基にSRVの設定
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-	srvDesc.Format = metadata.format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D; // 2Dテクスチャ
-	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
-
-	// SRVを作成するDescriptorHeapの場所を決める
-	D3D12_CPU_DESCRIPTOR_HANDLE textureSrvHandleCPU = srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU = srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart();
-	// 先頭はImGuiが使っているのでその次を使う
-	textureSrvHandleCPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	textureSrvHandleGPU.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-	// SRVの生成
-	device->CreateShaderResourceView(textureResource, &srvDesc, textureSrvHandleCPU);
 
 	// DSVの設定
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
@@ -792,8 +823,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	hr = commandList->Close();
 	assert(SUCCEEDED(hr));
 
-	Transform transform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+	// 2つのオブジェクト用にそれぞれ変数を定義
+	Transform transformA = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, { 0.0f, 0.0f, 0.0f} };
+	Transform transformB = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, { 0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -5.0f} };
+
+	// 初期値(白色など)を設定した変数
+	Vector4 cpuMaterialColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 
 #ifdef USE_IMGUI
 	// ImGuiの初期化
@@ -835,24 +871,59 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
 
-			transform.rotate.y += 0.03f;
-			Matrix4x4 worldMatrix = MatrixUtility::MakeAffineMatrix(transform.scale, transform.rotate, transform.translate);
-			Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
-			Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
-			Matrix4x4 projectionMatrix = MatrixUtility::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
-			Matrix4x4 worldViewProjectionMatrix = MatrixUtility::Multiply(worldMatrix, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
-			*wvpData = worldViewProjectionMatrix;
+			
 
 
 #ifdef USE_IMGUI
 			// 開発用UIの処理。実際に開発用のUIを出す場合はここをゲーム固有の処理に置き換える
-			ImGui::Begin("Window");
+			ImGui::Begin("Settings");
 
-			ImGui::ColorEdit4("triangleColor", &materialData->x);
+			// アップロードヒープではなく、CPU側の安全な変数を操作させる
+			ImGui::ColorEdit3("triangleColor", &cpuMaterialColor.x);
+
+			// 最初から開かれていて、ハイライトされている状態
+			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Selected;
+			
+			const char* textureNames[] = { "UVChecker", "bossChameleon", "golemRushLeft"};
+
+			// 階層構造にする
+			if (ImGui::TreeNodeEx("ObjectA", flags))
+			{
+				ImGui::DragFloat3("Translate", &transformA.translate.x, 0.01f);
+				ImGui::DragFloat3("Rotate", &transformA.rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale", &transformA.scale.x, 0.01f);
+				
+				// テクスチャ切り替え用UI
+				ImGui::Combo("Texture", &selectTextureIndexA, textureNames, IM_ARRAYSIZE(textureNames));
+				ImGui::TreePop();
+			}
+
+			if (ImGui::TreeNodeEx("ObjectB", flags))
+			{
+				ImGui::DragFloat3("Translate", &transformB.translate.x, 0.01f);
+				ImGui::DragFloat3("Rotate", &transformB.rotate.x, 0.01f);
+				ImGui::DragFloat3("Scale", &transformB.scale.x, 0.01f);
+
+				// テクスチャ切り替え用UI
+				ImGui::Combo("Texture", &selectTextureIndexB, textureNames, IM_ARRAYSIZE(textureNames));
+				ImGui::TreePop();
+			}
+	
 
 			ImGui::End();
 #endif 
 
+			Matrix4x4 worldMatrixA = MatrixUtility::MakeAffineMatrix(transformA.scale, transformA.rotate, transformA.translate);
+			Matrix4x4 worldMatrixB = MatrixUtility::MakeAffineMatrix(transformB.scale, transformB.rotate, transformB.translate);
+			Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
+			Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
+			Matrix4x4 projectionMatrix = MatrixUtility::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+			Matrix4x4 worldViewProjectionMatrixA = MatrixUtility::Multiply(worldMatrixA, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
+			Matrix4x4 worldViewProjectionMatrixB = MatrixUtility::Multiply(worldMatrixB, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
+			// それぞれのバッファに書き込む
+			*wvpDataA = worldViewProjectionMatrixA;
+			*wvpDataB = worldViewProjectionMatrixB;
+			
 			// これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -900,16 +971,28 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 形状を設定。PSOに設定しているものとはまた別。同じものを設定すると考えておけばよい
 			commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+			// 行列の更新などの後、描画コマンドを積む前にデータを転送
+			*materialData = cpuMaterialColor; // CPUメモリからWCメモリへの書き込み
+
 			// マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-
-			commandList->SetGraphicsRootConstantBufferView(1, wvpResource->GetGPUVirtualAddress());
-
+			
+			// オブジェクトAの描画
 			// SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
-			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU);
+			// 選択されているテクスチャのGPUハンドルをセット
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[selectTextureIndexA]);
+			// AのWVP行列をセット
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceA->GetGPUVirtualAddress());
+			// 3頂点で1つのインスタンスを描画(頂点番号0～2を使用)
+			commandList->DrawInstanced(3, 1, 0, 0);
 
-			// 描画! (DrawCall/ドローコール).6頂点で1つのインスタンス。
-			commandList->DrawInstanced(6, 1, 0, 0);
+			// オブジェクトBの描画
+			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[selectTextureIndexB]);
+			// BのWVP行列をセット
+			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceB->GetGPUVirtualAddress());
+			// 3頂点で1つのインスタンスを描画(頂点番号3～5を使用)
+			commandList->DrawInstanced(3, 1, 3, 0);
+
 
 #ifdef USE_IMGUI
 			// ImGuiの内部コマンドを生成する
@@ -971,8 +1054,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	depthStencilResource->Release();
 	vertexResource->Release();
 	materialResource->Release();
-	textureResource->Release();
-	wvpResource->Release();
+
+	// すべてのテクスチャリソースを解放
+	for (size_t i = 0; i < kNumTextures; ++i) {
+		if (textureResources[i]) {
+			textureResources[i]->Release();
+		}
+	}
+
+	wvpResourceA->Release();
+	wvpResourceB->Release();
 
 	// パイプライン・シェーダー・ルートシグネチャ類を解放
 	graphicsPipelineState->Release();
