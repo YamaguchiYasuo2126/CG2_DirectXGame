@@ -629,8 +629,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// RasterizerStateの設定
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
-	// 裏面(時計回り)を表示しない
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	// 裏面(時計回り)を表示する
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	// 三角形の中を塗りつぶす
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
@@ -801,6 +801,38 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	// DSVHeapの先頭にDSVを作る
 	device->CreateDepthStencilView(depthStencilResource, &dsvDesc, dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
+	// 画面切り替え演出用の設定
+	const int kGridCols = 12; // 横の分割数
+	const int kGridRows = 8;  // 縦の分割数
+	const int kNumTriangles = kGridCols * kGridRows * 2; // 総三角形数
+	const int kNumTransitionVertices = kNumTriangles * 3; // 総頂点数
+
+	// 演出管理フラグとタイマー
+	bool isTransitionActive = false;
+	float transitionTime = 0.0f;
+
+	// 演出用の頂点バッファの作成
+	ID3D12Resource* transitionBuffer = CreateBufferResource(device, sizeof(VertexData) * kNumTransitionVertices);
+
+	D3D12_VERTEX_BUFFER_VIEW transitionBufferView{};
+	transitionBufferView.BufferLocation = transitionBuffer->GetGPUVirtualAddress();
+	transitionBufferView.SizeInBytes = sizeof(VertexData) * kNumTransitionVertices;
+	transitionBufferView.StrideInBytes = sizeof(VertexData);
+
+	// 演出用のWVPバッファの作成（中身は常に単位行列）
+	ID3D12Resource* transitionWvpResource = CreateBufferResource(device, sizeof(Matrix4x4));
+	Matrix4x4* transitionWvpData = nullptr;
+	transitionWvpResource->Map(0, nullptr, reinterpret_cast<void**>(&transitionWvpData));
+	*transitionWvpData = MatrixUtility::MakeIdentity4x4(); // 単位行列を書き込んでおく
+
+	// 演出用のマテリアル(色)バッファの作成
+	ID3D12Resource* transitionMaterialResource = CreateBufferResource(device, sizeof(Vector4)); // もしVector4の構造体があればそれを使用
+	Vector4* transitionMaterialData = nullptr;
+	transitionMaterialResource->Map(0, nullptr, reinterpret_cast<void**>(&transitionMaterialData));
+
+	// 演出用の三角形の色をここで指定
+	*transitionMaterialData = Vector4(0.0f, 0.6f, 0.8f, 0.5f);
+
 	// ビューポート
 	D3D12_VIEWPORT viewport{};
 	// クライアント領域のサイズと一緒にして画面全体に表示
@@ -871,7 +903,115 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
 
-			
+			// 演出の開始入力チェック
+			// スペースキーが押されたら演出スタート
+			if (GetAsyncKeyState(VK_SPACE) & 0x8000) {
+				if (!isTransitionActive) {
+					isTransitionActive = true;
+					transitionTime = 0.0f;
+				}
+			}
+
+			// 演出の更新と頂点バッファへの書き込み
+			if (isTransitionActive) {
+				transitionTime += 1.0f / 60.0f; // フレームレートに合わせて進める
+
+				// トランジション中の色変化アニメーション
+				float progress = std::clamp(static_cast<float>(transitionTime) / 120.0f, 0.0f, 1.0f);
+
+				// 進行度（progress）に合わせてRGBを変化させる
+				transitionMaterialData->x = (0.0f + progress * 0.4f) + std::sin(progress * 10.0f) * 0.1f;
+				transitionMaterialData->y = (0.8f - progress * 0.5f) + std::sin(progress * 12.0f) * 0.1f;
+				transitionMaterialData->z = (0.6f + progress * 0.4f) + std::cos(progress * 8.0f) * 0.1f;
+				transitionMaterialData->w = 1.0f;
+
+				// 頂点バッファをマップ
+				VertexData* vData = nullptr;
+				transitionBuffer->Map(0, nullptr, reinterpret_cast<void**>(&vData));
+
+				float cellW = 2.0f / kGridCols; // 画面幅(-1〜1の計2.0)を分割
+				float cellH = 2.0f / kGridRows; // 画面高(-1〜1の計2.0)を分割
+				int vIdx = 0;
+
+				for (int r = 0; r < kGridRows; ++r) {
+					for (int c = 0; c < kGridCols; ++c) {
+						// セルの左下座標
+						float left = -1.0f + c * cellW;
+						float bottom = -1.0f + r * cellH;
+
+						// セル（四角形）の中心座標
+						float centerX = left + cellW * 0.5f;
+						float centerY = bottom + cellH * 0.5f;
+
+						float hW = cellW * 0.5f;
+						float hH = cellH * 0.5f;
+
+						// 左から右へ波打つようにディレイ（時間差）をかける
+						float delay = c * 0.1f;
+						float localTime = transitionTime - delay;
+						if (localTime < 0.0f) localTime = 0.0f;
+
+						// 回転角度（パタッと180度裏返る）
+						float theta = localTime * 4.0f;
+						if (theta > 3.141592f) theta = 3.141592f;
+
+						// --- 変更点：各三角形の重心を基準に回転させるラムダ関数 ---
+						auto CalcTriangleVertexPos = [&](float localX, float localY, float gravityX, float gravityY) {
+							// 自身の三角形の重心からの相対位置（オフセット）にする
+							float relX = localX - gravityX;
+							float relY = localY - gravityY;
+
+							// 重心を中心にY軸回転（3D的な奥行きZも計算）
+							float rx = relX * cosf(theta);
+							float ry = relY;
+							float rz = -relX * sinf(theta);
+
+							// ワールド空間（画面上の絶対座標）に変換
+							Vector4 pos;
+							pos.x = centerX + gravityX + rx;
+							pos.y = centerY + gravityY + ry;
+							pos.z = 0.1f + rz * 0.05f;
+							pos.w = 1.0f;
+							return pos;
+							};
+
+						// ローカル座標系における、この三角形の重心(gravity)を計算
+						float g1x = (-hW - hW + hW) / 3.0f;
+						float g1y = (-hH + hH + hH) / 3.0f;
+
+						Vector4 p1_LB = CalcTriangleVertexPos(-hW, -hH, g1x, g1y);
+						Vector4 p1_LT = CalcTriangleVertexPos(-hW, hH, g1x, g1y);
+						Vector4 p1_RT = CalcTriangleVertexPos(hW, hH, g1x, g1y);
+
+						vData[vIdx++] = { p1_LB, {100.0f, 100.0f} };
+						vData[vIdx++] = { p1_LT, {100.0f, 100.0f} };
+						vData[vIdx++] = { p1_RT, {100.0f, 100.0f} };
+
+						// ローカル座標系における、この三角形の重心(gravity)を計算
+						float g2x = (-hW + hW + hW) / 3.0f;
+						float g2y = (-hH + hH - hH) / 3.0f;
+
+						Vector4 p2_LB = CalcTriangleVertexPos(-hW, -hH, g2x, g2y);
+						Vector4 p2_RT = CalcTriangleVertexPos(hW, hH, g2x, g2y);
+						Vector4 p2_RB = CalcTriangleVertexPos(hW, -hH, g2x, g2y);
+
+						vData[vIdx++] = { p2_LB, {100.0f, 100.0f} };
+						vData[vIdx++] = { p2_RT, {100.0f, 100.0f} };
+						vData[vIdx++] = { p2_RB, {100.0f, 100.0f} };
+					}
+				}
+				transitionBuffer->Unmap(0, nullptr);
+
+				// 演出終了の自動判定
+				float maxDelay = (kGridCols - 1) * 0.1f; // 最後の列(一番右)が動き出すまでのディレイ時間
+				float rotateDuration = 3.141592f / 4.0f; // 三角形が180度回転するのにかかる時間(thetaの計算に基づきます)
+
+				// 全体の経過時間が、最後の三角形が回りきる時間を超えたら演出終了
+				if (transitionTime > maxDelay + rotateDuration) {
+					isTransitionActive = false;
+					transitionTime = 0.0f;      // タイマーをリセット
+				}
+			}
 
 
 #ifdef USE_IMGUI
@@ -977,7 +1117,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// マテリアルCBufferの場所を設定
 			commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 			
-			// オブジェクトAの描画
+			// 三角形Aの描画
 			// SRVのDescriptorTableの先頭を設定。2はrootParameter[2]である
 			// 選択されているテクスチャのGPUハンドルをセット
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[selectTextureIndexA]);
@@ -986,13 +1126,32 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 3頂点で1つのインスタンスを描画(頂点番号0～2を使用)
 			commandList->DrawInstanced(3, 1, 0, 0);
 
-			// オブジェクトBの描画
+			// 三角形Bの描画
 			commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandlesGPU[selectTextureIndexB]);
 			// BのWVP行列をセット
 			commandList->SetGraphicsRootConstantBufferView(1, wvpResourceB->GetGPUVirtualAddress());
 			// 3頂点で1つのインスタンスを描画(頂点番号3～5を使用)
 			commandList->DrawInstanced(3, 1, 3, 0);
 
+
+			// トランジション演出の描画
+			if (isTransitionActive) {
+
+				// 演出用のマテリアルをルートパラメータ0番にセット
+				commandList->SetGraphicsRootConstantBufferView(0, transitionMaterialResource->GetGPUVirtualAddress());
+
+				// 演出用のWVP（単位行列）を設定
+				commandList->SetGraphicsRootConstantBufferView(1, transitionWvpResource->GetGPUVirtualAddress());
+
+				// 演出用の頂点バッファをセット
+				commandList->IASetVertexBuffers(0, 1, &transitionBufferView);
+
+				// 描画を実行 (画面のすべての格子を一括描画)
+				commandList->DrawInstanced(kNumTransitionVertices, 1, 0, 0);
+
+				// 次のフレームのために元の頂点バッファ(既存の三角形用)に設定を戻しておく
+				commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+			}
 
 #ifdef USE_IMGUI
 			// ImGuiの内部コマンドを生成する
@@ -1061,7 +1220,9 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			textureResources[i]->Release();
 		}
 	}
-
+	transitionBuffer->Release();
+	transitionWvpResource->Release();
+	transitionMaterialResource->Release();
 	wvpResourceA->Release();
 	wvpResourceB->Release();
 

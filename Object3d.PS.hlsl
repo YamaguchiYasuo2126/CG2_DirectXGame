@@ -15,7 +15,16 @@ struct PixelShaderOutput {
 
 PixelShaderOutput main(VertexShaderOutput input) {
     PixelShaderOutput output;
-    float4 textureColor = gTexture.Sample(gSampler, input.texcoord);
-	output.color = gMaterial.color * textureColor;
+    // UV座標のXが 1.0 より大きければ、テクスチャを適用せずマテリアルの色（C++で計算した色）のみにする
+    if (input.texcoord.x > 1.0f)
+    {
+        output.color = gMaterial.color;
+    }
+    else
+    {
+        // 通常の三角形は今まで通りテクスチャを適用
+        float4 textureColor = gTexture.Sample(gSampler, input.texcoord);
+        output.color = gMaterial.color * textureColor;
+    }
     return output;
 }
