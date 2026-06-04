@@ -18,7 +18,16 @@ PixelShaderOutput main(VertexShaderOutput input) {
     // UV座標のXが 1.0 より大きければ、テクスチャを適用せずマテリアルの色（C++で計算した色）のみにする
     if (input.texcoord.x > 1.0f)
     {
-        output.color = gMaterial.color;
+        // 演出用の描画処理
+        // gMaterial.color（時間で変化するメイン色）
+        float4 mainColor = gMaterial.color;
+        
+        // グラデーションの対比となる色（例としてメインの色を半分暗くした色）
+        float4 subColor = gMaterial.color * 0.4f;
+        subColor.a = gMaterial.color.a; // アルファ値は維持
+        
+        // input.texcoord.y (0.0 ～ 1.0) を使って、縦方向の滑らかなグラデーションを作る
+        output.color = lerp(subColor, mainColor, input.texcoord.y);
     }
     else
     {

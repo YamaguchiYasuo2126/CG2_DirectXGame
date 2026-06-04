@@ -9,6 +9,8 @@
 #include <d3d12.h>
 #include <dxgi1_6.h>
 #include <cassert>
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include <dxgidebug.h>
 #include <dxcapi.h>
 #include "Matrix4x4.h"
@@ -293,6 +295,32 @@ ID3D12Resource* CreateDepthStencilTextureResource(ID3D12Device* device, int32_t 
 		IID_PPV_ARGS(&resource)); // 作成するResourceポインタへのポインタ
 	assert(SUCCEEDED(hr));
 	return resource;
+}
+
+// 三角形の頂点位置を計算する関数
+Vector4 CalcTriangleVertexPos(float localX, float localY, float gravityX, float gravityY, float theta, float centerX, float centerY) {
+	float offsetXFromGravity = localX - gravityX;
+	float offsetYFromGravity = localY - gravityY;
+
+	float rotatedOffsetX = offsetXFromGravity * cosf(theta);
+	float rotatedOffsetY = offsetYFromGravity;
+	float rotatedOffsetZ = -offsetXFromGravity * sinf(theta);
+
+	Vector4 pos;
+	pos.x = centerX + gravityX + rotatedOffsetX;
+	pos.y = centerY + gravityY + rotatedOffsetY;
+
+	// 回転の途中に手前に飛び出させる
+	float popOutEffect = std::sin(theta) * 1.5f;
+	pos.z = 0.0f + (rotatedOffsetZ * 0.5f) - popOutEffect;
+	pos.w = 1.0f;
+
+	// プロジェクション行列による画面縮小を打ち消す計算
+	float perspectiveCompensation = 2.42f;
+	pos.x *= perspectiveCompensation;
+	pos.y *= perspectiveCompensation;
+
+	return pos;
 }
 
 // windowsアプリでのエントリーポイント(main関数)
@@ -684,6 +712,21 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 		IID_PPV_ARGS(&graphicsPipelineState));
 	assert(SUCCEEDED(hr));
 
+	// 演出専用のPSO
+	ID3D12PipelineState* transitionPipelineState = nullptr; 
+	// 既存のgraphicsPipelineStateDescをコピーして演出用に書き換える
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC transitionPipelineDesc = graphicsPipelineStateDesc;
+
+	// 演出用は深度テストを行わない設定にする
+	transitionPipelineDesc.DepthStencilState.DepthEnable = FALSE; // 深度テスト無効
+	transitionPipelineDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO; // 深度書き込み無効
+	transitionPipelineDesc.DSVFormat = DXGI_FORMAT_UNKNOWN;
+
+	// 演出専用のパイプラインステートを作成
+	hr = device->CreateGraphicsPipelineState(&transitionPipelineDesc, 
+		IID_PPV_ARGS(&transitionPipelineState));
+	assert(SUCCEEDED(hr));
+
 	// WVP用のリソースを作る。Matrix4x4 1つ分のサイズを用意する
 	ID3D12Resource* wvpResourceA = CreateBufferResource(device, sizeof(Matrix4x4));
 	// データを書き込む
@@ -706,8 +749,8 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	const size_t kNumTextures = 3; // 切り替えたいテクスチャの総数
 	std::string textureFilePaths[kNumTextures] = {
 		"resources/uvChecker.png",
-		"resources/bossChameleon.png",
-		"resources/golemRushLeft.png"
+		"resources/leaf.png",
+		"resources/zigzagPattern.png"
 	};
 
 	ID3D12Resource* textureResources[kNumTextures] = { nullptr };
@@ -809,7 +852,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// 演出管理フラグとタイマー
 	bool isTransitionActive = false;
-	float transitionTime = 0.0f;
+	float transitionTimer = 0.0f;
 
 	// 演出用の頂点バッファの作成
 	ID3D12Resource* transitionBuffer = CreateBufferResource(device, sizeof(VertexData) * kNumTransitionVertices);
@@ -903,113 +946,100 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			hr = commandList->Reset(commandAllocator, nullptr);
 			assert(SUCCEEDED(hr));
 
-			// 演出の開始入力チェック
-			// スペースキーが押されたら演出スタート
-			if (GetAsyncKeyState(VK_SPACE) & 0x8000) {
-				if (!isTransitionActive) {
-					isTransitionActive = true;
-					transitionTime = 0.0f;
-				}
-			}
-
 			// 演出の更新と頂点バッファへの書き込み
 			if (isTransitionActive) {
-				transitionTime += 1.0f / 60.0f; // フレームレートに合わせて進める
+				transitionTimer += 1.0f / 60.0f; // フレームレートに合わせて進める
 
-				// トランジション中の色変化アニメーション
-				float progress = std::clamp(static_cast<float>(transitionTime) / 120.0f, 0.0f, 1.0f);
+				// 演出終了の基準時間を計算(約1.88秒)
+				float maxDelay = (kGridCols - 1) * 0.1f;
+				float rotateDuration = static_cast<float>(M_PI) / 4.0f;
+				float totalDuration = maxDelay + rotateDuration;
 
-				// 進行度（progress）に合わせてRGBを変化させる
-				transitionMaterialData->x = (0.0f + progress * 0.4f) + std::sin(progress * 10.0f) * 0.1f;
-				transitionMaterialData->y = (0.8f - progress * 0.5f) + std::sin(progress * 12.0f) * 0.1f;
-				transitionMaterialData->z = (0.6f + progress * 0.4f) + std::cos(progress * 8.0f) * 0.1f;
+				// 演出の総時間を基準にprogress(0.0 ～ 1.0)を計算
+				float progress = std::clamp(transitionTimer / totalDuration, 0.0f, 1.0f);
+
+				// サイン波の周波数などを用いて色のグラデーションを作る
+				transitionMaterialData->x = (0.0f + progress * 0.4f) + std::sin(progress * 15.0f) * 0.1f;
+				transitionMaterialData->y = (0.8f - progress * 0.5f) + std::sin(progress * 18.0f) * 0.1f;
+				transitionMaterialData->z = (0.6f + progress * 0.4f) + std::cos(progress * 12.0f) * 0.1f;
 				transitionMaterialData->w = 1.0f;
 
 				// 頂点バッファをマップ
-				VertexData* vData = nullptr;
-				transitionBuffer->Map(0, nullptr, reinterpret_cast<void**>(&vData));
+				VertexData* vertexDataBuffer = nullptr;
+				transitionBuffer->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataBuffer));
 
-				float cellW = 2.0f / kGridCols; // 画面幅(-1〜1の計2.0)を分割
-				float cellH = 2.0f / kGridRows; // 画面高(-1〜1の計2.0)を分割
-				int vIdx = 0;
+				float cellWidth = 2.0f / kGridCols;
+				float cellHeight = 2.0f / kGridRows;
+				// 現在の書き込み先を示す頂点インデックス
+				int currentVertexIndex = 0;
 
-				for (int r = 0; r < kGridRows; ++r) {
-					for (int c = 0; c < kGridCols; ++c) {
-						// セルの左下座標
-						float left = -1.0f + c * cellW;
-						float bottom = -1.0f + r * cellH;
+				for (int i = 0; i < kGridRows; ++i) {
+					// 縦方向のグラデーション位置を計算(0.0 ～ 1.0)
+					// 下の行ほど0.0に近く、上の行ほど1.0に近くなる
+					float gradationYBottom = static_cast<float>(i) / kGridRows;
+					float gradationYTop = static_cast<float>(i + 1) / kGridRows;
 
-						// セル（四角形）の中心座標
-						float centerX = left + cellW * 0.5f;
-						float centerY = bottom + cellH * 0.5f;
+					for (int j = 0; j < kGridCols; ++j) {
 
-						float hW = cellW * 0.5f;
-						float hH = cellH * 0.5f;
+						float cellLeft = -1.0f + j * cellWidth;
+						float cellBottom = -1.0f + i * cellHeight;
+						float cellCenterX = cellLeft + cellWidth * 0.5f;
+						float cellCenterY = cellBottom + cellHeight * 0.5f;
+						
+						// セルの中心から端までの長さ
+						float cellHalfWidth = cellWidth * 0.5f;
+						float cellHalfHeight = cellHeight * 0.5f;
 
-						// 左から右へ波打つようにディレイ（時間差）をかける
-						float delay = c * 0.1f;
-						float localTime = transitionTime - delay;
-						if (localTime < 0.0f) localTime = 0.0f;
+						float delay = j * 0.1f;
+						float localTime = transitionTimer - delay;
+						if (localTime < 0.0f)
+						{
+							localTime = 0.0f;
+						}
 
-						// 回転角度（パタッと180度裏返る）
 						float theta = localTime * 4.0f;
-						if (theta > 3.141592f) theta = 3.141592f;
+						if (theta > static_cast<float>(M_PI))
+						{
+							theta = static_cast<float>(M_PI);
+						}
+						
+						// 格子内の左上側の三角形の計算
+						// 左上側の三角形の重心
+						float leftTopGravityX = (-cellHalfWidth - cellHalfWidth + cellHalfWidth) / 3.0f;
+						float leftTopGravityY = (-cellHalfHeight + cellHalfHeight + cellHalfHeight) / 3.0f;
 
-						// --- 変更点：各三角形の重心を基準に回転させるラムダ関数 ---
-						auto CalcTriangleVertexPos = [&](float localX, float localY, float gravityX, float gravityY) {
-							// 自身の三角形の重心からの相対位置（オフセット）にする
-							float relX = localX - gravityX;
-							float relY = localY - gravityY;
+						// 各頂点の位置
+						Vector4 leftTopTriangleLeftBottom = CalcTriangleVertexPos(-cellHalfWidth, -cellHalfHeight, leftTopGravityX, leftTopGravityY, theta, cellCenterX, cellCenterY);
+						Vector4 leftTopTriangleLeftLeftTop = CalcTriangleVertexPos(-cellHalfWidth, cellHalfHeight, leftTopGravityX, leftTopGravityY, theta, cellCenterX, cellCenterY);
+						Vector4 leftTopTriangleRightTop = CalcTriangleVertexPos(cellHalfWidth, cellHalfHeight, leftTopGravityX, leftTopGravityY, theta, cellCenterX, cellCenterY);
 
-							// 重心を中心にY軸回転（3D的な奥行きZも計算）
-							float rx = relX * cosf(theta);
-							float ry = relY;
-							float rz = -relX * sinf(theta);
+						// texcoord.y にグラデーション用の比率を格納
+						vertexDataBuffer[currentVertexIndex++] = { leftTopTriangleLeftBottom, {100.0f, gradationYBottom} };
+						vertexDataBuffer[currentVertexIndex++] = { leftTopTriangleLeftLeftTop, {100.0f, gradationYTop} };
+						vertexDataBuffer[currentVertexIndex++] = { leftTopTriangleRightTop, {100.0f, gradationYTop} };
 
-							// ワールド空間（画面上の絶対座標）に変換
-							Vector4 pos;
-							pos.x = centerX + gravityX + rx;
-							pos.y = centerY + gravityY + ry;
-							pos.z = 0.1f + rz * 0.05f;
-							pos.w = 1.0f;
-							return pos;
-							};
+						// 格子内の右下側の三角形の計算
+						// 右下の三角形の重心
+						float RightBottomGravityX = (-cellHalfWidth + cellHalfWidth + cellHalfWidth) / 3.0f;
+						float RightBottomGravityY = (-cellHalfHeight + cellHalfHeight - cellHalfHeight) / 3.0f;
 
-						// ローカル座標系における、この三角形の重心(gravity)を計算
-						float g1x = (-hW - hW + hW) / 3.0f;
-						float g1y = (-hH + hH + hH) / 3.0f;
+						// 各頂点の位置
+						Vector4 RightBottomTriangleLeftBottom = CalcTriangleVertexPos(-cellHalfWidth, -cellHalfHeight, RightBottomGravityX, RightBottomGravityY, theta, cellCenterX, cellCenterY);
+						Vector4 RightBottomTriangleRightTop = CalcTriangleVertexPos(cellHalfWidth, cellHalfHeight, RightBottomGravityX, RightBottomGravityY, theta, cellCenterX, cellCenterY);
+						Vector4 RightBottomTriangleRightBottom = CalcTriangleVertexPos(cellHalfWidth, -cellHalfHeight, RightBottomGravityX, RightBottomGravityY, theta, cellCenterX, cellCenterY);
 
-						Vector4 p1_LB = CalcTriangleVertexPos(-hW, -hH, g1x, g1y);
-						Vector4 p1_LT = CalcTriangleVertexPos(-hW, hH, g1x, g1y);
-						Vector4 p1_RT = CalcTriangleVertexPos(hW, hH, g1x, g1y);
-
-						vData[vIdx++] = { p1_LB, {100.0f, 100.0f} };
-						vData[vIdx++] = { p1_LT, {100.0f, 100.0f} };
-						vData[vIdx++] = { p1_RT, {100.0f, 100.0f} };
-
-						// ローカル座標系における、この三角形の重心(gravity)を計算
-						float g2x = (-hW + hW + hW) / 3.0f;
-						float g2y = (-hH + hH - hH) / 3.0f;
-
-						Vector4 p2_LB = CalcTriangleVertexPos(-hW, -hH, g2x, g2y);
-						Vector4 p2_RT = CalcTriangleVertexPos(hW, hH, g2x, g2y);
-						Vector4 p2_RB = CalcTriangleVertexPos(hW, -hH, g2x, g2y);
-
-						vData[vIdx++] = { p2_LB, {100.0f, 100.0f} };
-						vData[vIdx++] = { p2_RT, {100.0f, 100.0f} };
-						vData[vIdx++] = { p2_RB, {100.0f, 100.0f} };
+						// texcoord.y にグラデーション用の比率を格納
+						vertexDataBuffer[currentVertexIndex++] = { RightBottomTriangleLeftBottom, {100.0f, gradationYBottom} };
+						vertexDataBuffer[currentVertexIndex++] = { RightBottomTriangleRightTop, {100.0f, gradationYTop} };
+						vertexDataBuffer[currentVertexIndex++] = { RightBottomTriangleRightBottom, {100.0f, gradationYBottom} };
 					}
 				}
 				transitionBuffer->Unmap(0, nullptr);
 
-				// 演出終了の自動判定
-				float maxDelay = (kGridCols - 1) * 0.1f; // 最後の列(一番右)が動き出すまでのディレイ時間
-				float rotateDuration = 3.141592f / 4.0f; // 三角形が180度回転するのにかかる時間(thetaの計算に基づきます)
-
 				// 全体の経過時間が、最後の三角形が回りきる時間を超えたら演出終了
-				if (transitionTime > maxDelay + rotateDuration) {
+				if (transitionTimer > maxDelay + rotateDuration) {
 					isTransitionActive = false;
-					transitionTime = 0.0f;      // タイマーをリセット
+					transitionTimer = 0.0f;      // タイマーをリセット
 				}
 			}
 
@@ -1024,7 +1054,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 			// 最初から開かれていて、ハイライトされている状態
 			ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Selected;
 			
-			const char* textureNames[] = { "UVChecker", "bossChameleon", "golemRushLeft"};
+			const char* textureNames[] = { "UVChecker", "leaf", "zigzagPattern"};
 
 			// 階層構造にする
 			if (ImGui::TreeNodeEx("ObjectA", flags))
@@ -1048,22 +1078,41 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 				ImGui::Combo("Texture", &selectTextureIndexB, textureNames, IM_ARRAYSIZE(textureNames));
 				ImGui::TreePop();
 			}
-	
+
+			// 演出の開始入力チェック	
+			if (ImGui::Button("ScreenTransition")) {
+				if (!isTransitionActive) {
+					isTransitionActive = true;
+					transitionTimer = 0.0f;
+				}
+			}
 
 			ImGui::End();
 #endif 
-
+			// 通常三角形用のワールド行列
 			Matrix4x4 worldMatrixA = MatrixUtility::MakeAffineMatrix(transformA.scale, transformA.rotate, transformA.translate);
 			Matrix4x4 worldMatrixB = MatrixUtility::MakeAffineMatrix(transformB.scale, transformB.rotate, transformB.translate);
+
+			// 演出用のワールド行列
+			Transform transitionTransform = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+			Matrix4x4 worldMatrixTransition = MatrixUtility::MakeAffineMatrix(transitionTransform.scale, transitionTransform.rotate, transitionTransform.translate);
+
 			Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(cameraTransform.scale, cameraTransform.rotate, cameraTransform.translate);
 			Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
 			Matrix4x4 projectionMatrix = MatrixUtility::MakePerspectiveFovMatrix(0.45f, float(kClientWidth) / float(kClientHeight), 0.1f, 100.0f);
+			
+			// 通常三角形用のWVP行列
 			Matrix4x4 worldViewProjectionMatrixA = MatrixUtility::Multiply(worldMatrixA, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
 			Matrix4x4 worldViewProjectionMatrixB = MatrixUtility::Multiply(worldMatrixB, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
+
+			// 演出用のWVP行列
+			Matrix4x4 worldViewProjectionMatrixTransition = MatrixUtility::Multiply(worldMatrixTransition, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
+
 			// それぞれのバッファに書き込む
 			*wvpDataA = worldViewProjectionMatrixA;
 			*wvpDataB = worldViewProjectionMatrixB;
-			
+			*transitionWvpData = worldViewProjectionMatrixTransition;
+
 			// これから書き込むバックバッファのインデックスを取得
 			UINT backBufferIndex = swapChain->GetCurrentBackBufferIndex();
 
@@ -1136,6 +1185,13 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 			// トランジション演出の描画
 			if (isTransitionActive) {
+				// レンダーターゲットのみを設定し、演出用三角形は深度を無視して描画する
+				commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], FALSE, nullptr);
+
+				// 演出用としてここにも記述する
+				commandList->SetGraphicsRootSignature(rootSignature);
+				commandList->SetPipelineState(transitionPipelineState);
+				commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 				// 演出用のマテリアルをルートパラメータ0番にセット
 				commandList->SetGraphicsRootConstantBufferView(0, transitionMaterialResource->GetGPUVirtualAddress());
@@ -1145,12 +1201,15 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 				// 演出用の頂点バッファをセット
 				commandList->IASetVertexBuffers(0, 1, &transitionBufferView);
-
+				
 				// 描画を実行 (画面のすべての格子を一括描画)
 				commandList->DrawInstanced(kNumTransitionVertices, 1, 0, 0);
 
 				// 次のフレームのために元の頂点バッファ(既存の三角形用)に設定を戻しておく
 				commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+
+				// 演出描画が終わったら、次のフレームのために通常の「深度バッファあり」の設定に戻しておく
+				commandList->OMSetRenderTargets(1, &rtvHandles[backBufferIndex], FALSE, &dsvHandle);
 			}
 
 #ifdef USE_IMGUI
@@ -1227,6 +1286,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	wvpResourceB->Release();
 
 	// パイプライン・シェーダー・ルートシグネチャ類を解放
+	if (transitionPipelineState) 
+	{ 
+		transitionPipelineState->Release(); 
+	}
+
 	graphicsPipelineState->Release();
 	signatureBlob->Release();
 	if (errorBlob) {
