@@ -9,7 +9,7 @@
 
 class Logger;
 
-// DirectX 12の初期化、フレーム開始/終了、共通Descriptorを担当します。
+// DirectX 12の初期化、フレーム開始/終了、共通Descriptorを担当する
 class DirectXCommon {
 public:
 	void Initialize(HWND hwnd, int32_t width, int32_t height, Logger* logger);
@@ -28,10 +28,10 @@ public:
 	int32_t GetHeight() const { return height_; }
 
 private:
-	// SwapChainのバックバッファ数です。現在はダブルバッファにしています。
+	// SwapChainのバックバッファ数。現在はダブルバッファ
 	static constexpr uint32_t kBackBufferCount = 2;
 
-	// Initializeから呼ばれるDirectX初期化処理です。
+	// Initializeから呼ばれるDirectX初期化処理
 	void EnableDebugLayer();
 	void CreateDevice();
 	void SetupDebugInfoQueue();

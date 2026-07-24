@@ -4,10 +4,12 @@
 
 #include "ConvertString.h"
 
-namespace DirectXResource {
+namespace DirectXResource 
+{
 
-Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes) {
-	// CPUから書き込めるUploadHeap上に、定数バッファや頂点バッファ用のResourceを作ります。
+Microsoft::WRL::ComPtr<ID3D12Resource> CreateBufferResource(ID3D12Device* device, size_t sizeInBytes)
+{
+	// CPUから書き込めるUploadHeap上に、定数バッファや頂点バッファ用のResourceを作る
 	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
 	uploadHeapProperties.Type = D3D12_HEAP_TYPE_UPLOAD;
 
