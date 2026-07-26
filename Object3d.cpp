@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include <dxcapi.h>
+#include <cmath>
 
 #include "DirectXCommon.h"
 #include "DirectXResource.h"
@@ -69,7 +70,7 @@ void Object3d::Draw() {
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU_);
-	commandList->DrawInstanced(6, 1, 0, 0);
+	commandList->DrawInstanced(1536, 1, 0, 0);
 }
 
 void Object3d::DrawImGui() {
@@ -224,29 +225,65 @@ void Object3d::CreateTexture() {
 	textureSrvHandleGPU_ = dxCommon_->GetSrvGpuHandle(1);
 }
 
-void Object3d::CreateVertexBuffer() {
-	// 三角形2つ分の頂点バッファを作成します。
-	vertexResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * 6);
+void Object3d::CreateVertexBuffer() 
+{
+	// 分割数と総頂点数の定義
+	const uint32_t kSubdivision = 16;
+	const uint32_t kVertexCount = kSubdivision * kSubdivision * 6;
+
+	// 球に必要な頂点数分のバッファを作成
+	vertexResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * kVertexCount);
 
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
-	vertexBufferView_.SizeInBytes = sizeof(VertexData) * 6;
+	vertexBufferView_.SizeInBytes = sizeof(VertexData) * kVertexCount;
 	vertexBufferView_.StrideInBytes = sizeof(VertexData);
 
 	VertexData* vertexData = nullptr;
 	vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-	// 1つ目の三角形です。
-	vertexData[0].position = { -0.5f, -0.5f, 0.0f, 1.0f };
-	vertexData[0].texcoord = { 0.0f, 1.0f };
-	vertexData[1].position = { 0.0f, 0.5f, 0.0f, 1.0f };
-	vertexData[1].texcoord = { 0.5f, 0.0f };
-	vertexData[2].position = { 0.5f, -0.5f, 0.0f, 1.0f };
-	vertexData[2].texcoord = { 1.0f, 1.0f };
 
-	// 2つ目の三角形です。Z値を変えて奥行きが見えるようにしています。
-	vertexData[3].position = { -0.5f, -0.5f, 0.5f, 1.0f };
-	vertexData[3].texcoord = { 0.0f, 1.0f };
-	vertexData[4].position = { 0.0f, 0.0f, 0.0f, 1.0f };
-	vertexData[4].texcoord = { 0.5f, 0.0f };
-	vertexData[5].position = { 0.5f, -0.5f, -0.5f, 1.0f };
-	vertexData[5].texcoord = { 1.0f, 1.0f };
+	// 経度(lon)と緯度(lat)の1分割あたりの角度を求めます。
+	const float pi = 3.141592654f;
+	const float kLonEvery = pi * 2.0f / float(kSubdivision);
+	const float kLatEvery = pi / float(kSubdivision);
+
+	// 緯度の方向に分割
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
+		float lat = -pi / 2.0f + kLatEvery * latIndex; // 現在の緯度 (θ)
+
+		// 経度の方向に分割しながら線を描く
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
+			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
+			float lon = lonIndex * kLonEvery; // 現在の経度 (φ)
+
+			// 1つの四角形を構成する4頂点(a, b, c, d)のUV座標を計算
+			float u_a = float(lonIndex) / float(kSubdivision);
+			float v_a = 1.0f - float(latIndex) / float(kSubdivision);
+			float u_b = u_a;
+			float v_b = 1.0f - float(latIndex + 1) / float(kSubdivision);
+			float u_c = float(lonIndex + 1) / float(kSubdivision);
+			float v_c = v_a;
+			float u_d = u_c;
+			float v_d = v_b;
+
+			// --- 1枚目の三角形 (a, b, c) ---
+			// 基準点 a (左下)
+			vertexData[start].position = { std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon), 1.0f };
+			vertexData[start].texcoord = { u_a, v_a };
+			// 点 b (左上)
+			vertexData[start + 1].position = { std::cos(lat + kLatEvery) * std::cos(lon), std::sin(lat + kLatEvery), std::cos(lat + kLatEvery) * std::sin(lon), 1.0f };
+			vertexData[start + 1].texcoord = { u_b, v_b };
+			// 点 c (右下)
+			vertexData[start + 2].position = { std::cos(lat) * std::cos(lon + kLonEvery), std::sin(lat), std::cos(lat) * std::sin(lon + kLonEvery), 1.0f };
+			vertexData[start + 2].texcoord = { u_c, v_c };
+
+			// --- 2枚目の三角形 (c, b, d) ---
+			// 点 c (右下)
+			vertexData[start + 3] = vertexData[start + 2];
+			// 点 b (左上)
+			vertexData[start + 4] = vertexData[start + 1];
+			// 点 d (右上)
+			vertexData[start + 5].position = { std::cos(lat + kLatEvery) * std::cos(lon + kLonEvery), std::sin(lat + kLatEvery), std::cos(lat + kLatEvery) * std::sin(lon + kLonEvery), 1.0f };
+			vertexData[start + 5].texcoord = { u_d, v_d };
+		}
+	}
 }
