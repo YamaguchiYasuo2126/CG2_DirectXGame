@@ -5,6 +5,7 @@
 #include "Object3d.h"
 #include "ShaderCompiler.h"
 #include "WinApp.h"
+#include "Sprite.h"
 
 // アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
 class GameApplication {
@@ -25,5 +26,6 @@ private:
 	DirectXCommon dxCommon_;
 	ShaderCompiler shaderCompiler_;
 	Object3d object3d_;
+	Sprite sprite_;
 	bool initialized_ = false;
 };

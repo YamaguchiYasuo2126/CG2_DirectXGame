@@ -75,8 +75,8 @@ void Object3d::Draw() {
 void Object3d::DrawImGui() {
 #ifdef USE_IMGUI
 	// マテリアル色をImGuiから編集できるようにします。
-	ImGui::Begin("Window");
-	ImGui::ColorEdit4("triangleColor", &materialData_->x);
+	ImGui::Begin("Settings");
+	ImGui::ColorEdit4("material", &materialData_->x);
 	ImGui::End();
 #endif
 }
