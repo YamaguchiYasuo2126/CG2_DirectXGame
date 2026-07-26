@@ -5,6 +5,8 @@
 #include <d3d12.h>
 #include <dxcapi.h>
 #include <wrl.h>
+#include <array>
+#include <string>
 
 #include "Matrix4x4.h"
 #include "Transform.h"
@@ -47,14 +49,19 @@ private:
 	// 描画するオブジェクトが使うバッファとテクスチャです。
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
-	Microsoft::WRL::ComPtr<ID3D12Resource> textureResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
 	Matrix4x4* wvpData_ = nullptr;
 	Vector4* materialData_ = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
-	D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU_{};
 
-	// オブジェクト自身とカメラのTransformです。
+	// テクスチャリソースとSRVハンドルを2つ持つように配列化
+	std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> textureResources_;
+	std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> textureSrvHandleGPUs_{};
+
+	// 切り替え用のbool変数を用意する
+	bool useMonsterBall_ = true;
+
+	// オブジェクト自身とカメラのTransform
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 };

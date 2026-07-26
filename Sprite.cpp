@@ -45,7 +45,7 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 
     // データを書き込むためにMapする
     transformationMatrixResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite_));
-
+     
     // 初期値として単位行列を書き込んでおく
     *transformationMatrixDataSprite_ = MatrixUtility::MakeIdentity4x4();
 }
@@ -82,8 +82,10 @@ void Sprite::Draw() {
     commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite_);
 
     // 1番のRootParameter（VertexShaderのWVP行列用）をSprite用のバッファに差し替え
-    // ※ 0番(マテリアル)と2番(テクスチャ)は3D描画の時の設定がそのまま残っているので設定不要です
     commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite_->GetGPUVirtualAddress());
+
+    // 明示的にuvCheckerのSRVをセットする
+    commandList->SetGraphicsRootDescriptorTable(2, dxCommon_->GetSrvGpuHandle(1));
 
     // 描画（ドローコール）
     commandList->DrawInstanced(6, 1, 0, 0);
@@ -101,7 +103,6 @@ void Sprite::DrawImGui()
     ImGui::Begin("Settings");
 
     // transformSprite_ の translate (平行移動) の X, Y, Z をいじれるようにする
-    // ドラッグしたときの変化量を 1.0f に設定
     ImGui::DragFloat3("translateSprite", &transformSprite_.translate.x, 1.0f);
 
     ImGui::End();

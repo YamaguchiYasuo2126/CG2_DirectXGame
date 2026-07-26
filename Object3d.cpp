@@ -31,7 +31,11 @@ void Object3d::Initialize(DirectXCommon* dxCommon, ShaderCompiler* shaderCompile
 void Object3d::Finalize() {
 	// ComPtrで管理しているDirectXリソースを明示的に解放します。
 	vertexResource_.Reset();
-	textureResource_.Reset();
+	// 配列化したテクスチャリソースをfor文で順番に解放する
+	for (uint32_t i = 0; i < 2; ++i)
+	{
+		textureResources_[i].Reset();
+	}
 	materialResource_.Reset();
 	wvpResource_.Reset();
 	graphicsPipelineState_.Reset();
@@ -69,7 +73,8 @@ void Object3d::Draw() {
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootDescriptorTable(2, textureSrvHandleGPU_);
+	// 変数を見て利用するSRVを決める（trueなら1番(モンスターボール)、falseなら0番(uvChecker)）
+	commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall_ ? textureSrvHandleGPUs_[1] : textureSrvHandleGPUs_[0]);
 	commandList->DrawInstanced(1536, 1, 0, 0);
 }
 
@@ -78,6 +83,12 @@ void Object3d::DrawImGui() {
 	// マテリアル色をImGuiから編集できるようにします。
 	ImGui::Begin("Settings");
 	ImGui::ColorEdit4("material", &materialData_->x);
+
+	
+	
+	// 切り替え用のチェックボックス
+	ImGui::Checkbox("useMonsterBall", &useMonsterBall_);
+
 	ImGui::End();
 #endif
 }
@@ -208,23 +219,31 @@ void Object3d::CreateConstantBuffers() {
 }
 
 void Object3d::CreateTexture() {
-	// 画像を読み込み、MipMap付きTextureResourceとしてGPUが参照できる形にします。
-	DirectX::ScratchImage mipImages = DirectXResource::LoadTexture("resources/uvChecker.png");
-	const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
-	textureResource_ = DirectXResource::CreateTextureResource(dxCommon_->GetDevice(), metadata);
-	DirectXResource::UploadTextureData(textureResource_.Get(), mipImages);
+	// 読み込みたいテクスチャのパスを配列にまとめます
+	std::string filePaths[2] = {
+		"resources/uvChecker.png",
+		"resources/monsterBall.png"
+	};
 
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
-	srvDesc.Format = metadata.format;
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+	// 2枚のテクスチャを順番に処理します
+	for (uint32_t i = 0; i < 2; ++i) {
+		// 画像を読み込み、MipMap付きTextureResourceとしてGPUが参照できる形
+		DirectX::ScratchImage mipImages = DirectXResource::LoadTexture(filePaths[i]);
+		const DirectX::TexMetadata& metadata = mipImages.GetMetadata();
+		textureResources_[i] = DirectXResource::CreateTextureResource(dxCommon_->GetDevice(), metadata);
+		DirectXResource::UploadTextureData(textureResources_[i].Get(), mipImages);
 
-	// 0番はImGui用に使うため、Object3dのTexture SRVは1番へ置きます。
-	dxCommon_->GetDevice()->CreateShaderResourceView(textureResource_.Get(), &srvDesc, dxCommon_->GetSrvCpuHandle(1));
-	textureSrvHandleGPU_ = dxCommon_->GetSrvGpuHandle(1);
+		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+		srvDesc.Format = metadata.format;
+		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		srvDesc.Texture2D.MipLevels = UINT(metadata.mipLevels);
+
+		// 0番はImGui用に使うため、Object3dのTexture SRVは 1番以降(i + 1) へ置きます。
+		dxCommon_->GetDevice()->CreateShaderResourceView(textureResources_[i].Get(), &srvDesc, dxCommon_->GetSrvCpuHandle(i + 1));
+		textureSrvHandleGPUs_[i] = dxCommon_->GetSrvGpuHandle(i + 1);
+	}
 }
-
 void Object3d::CreateVertexBuffer() 
 {
 	// 分割数と総頂点数の定義

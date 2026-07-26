@@ -123,16 +123,24 @@ void DirectXCommon::EndFrame() {
 
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetSrvCpuHandle(uint32_t index) const {
 	// CPU側からDescriptorを作成するための位置を、番号指定で返します。
-	D3D12_CPU_DESCRIPTOR_HANDLE handle = srvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
-	handle.ptr += SIZE_T(device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)) * index;
-	return handle;
+	return GetCPUDescriptorHandle(srvDescriptorHeap_.Get(), descriptorSizeSRV_, index);
 }
 
 D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetSrvGpuHandle(uint32_t index) const {
 	// シェーダーへ渡すGPU側DescriptorTableの位置を、番号指定で返します。
-	D3D12_GPU_DESCRIPTOR_HANDLE handle = srvDescriptorHeap_->GetGPUDescriptorHandleForHeapStart();
-	handle.ptr += UINT64(device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)) * index;
-	return handle;
+	return GetGPUDescriptorHandle(srvDescriptorHeap_.Get(), descriptorSizeSRV_, index);
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) const {
+	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	handleCPU.ptr += (descriptorSize * index);
+	return handleCPU;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) const {
+	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
+	handleGPU.ptr += (descriptorSize * index);
+	return handleGPU;
 }
 
 void DirectXCommon::EnableDebugLayer() {
@@ -185,6 +193,11 @@ void DirectXCommon::CreateDevice() {
 
 	assert(device_ != nullptr);
 	logger_->Log("Complete create D3D12Device!!!\n");
+
+	// DescriptorSizeを取得しておく
+	descriptorSizeSRV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+	descriptorSizeRTV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	descriptorSizeDSV_ = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 }
 
 void DirectXCommon::SetupDebugInfoQueue() {
@@ -272,10 +285,10 @@ void DirectXCommon::CreateRenderTargetViews() {
 	rtvDesc.Format = GetRenderTargetFormat();
 	rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvStartHandle = rtvDescriptorHeap_->GetCPUDescriptorHandleForHeapStart();
-	for (uint32_t i = 0; i < kBackBufferCount; ++i) {
-		rtvHandles_[i] = rtvStartHandle;
-		rtvHandles_[i].ptr += SIZE_T(device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV)) * i;
+	for (uint32_t i = 0; i < kBackBufferCount; ++i)
+	{
+		rtvHandles_[i] = GetCPUDescriptorHandle(rtvDescriptorHeap_.Get(), descriptorSizeRTV_, i);
+
 		device_->CreateRenderTargetView(swapChainResources_[i].Get(), &rtvDesc, rtvHandles_[i]);
 	}
 }

@@ -22,6 +22,11 @@ public:
 	ID3D12DescriptorHeap* GetSrvDescriptorHeap() const { return srvDescriptorHeap_.Get(); }
 	D3D12_CPU_DESCRIPTOR_HANDLE GetSrvCpuHandle(uint32_t index) const;
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvGpuHandle(uint32_t index) const;
+	
+	// 特定のインデックスのDescriptorHandleを取得する汎用関数
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) const;
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) const;
+
 	DXGI_FORMAT GetRenderTargetFormat() const { return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; }
 	uint32_t GetBackBufferCount() const { return kBackBufferCount; }
 	int32_t GetWidth() const { return width_; }
@@ -48,6 +53,11 @@ private:
 	Logger* logger_ = nullptr;
 	int32_t width_ = 0;
 	int32_t height_ = 0;
+
+	// DescriptorSizeを保存しておく変数
+	uint32_t descriptorSizeSRV_ = 0;
+	uint32_t descriptorSizeRTV_ = 0;
+	uint32_t descriptorSizeDSV_ = 0;
 
 	// DirectXの各種COMオブジェクトです。ComPtrで自動的にReleaseされます。
 #ifdef _DEBUG
