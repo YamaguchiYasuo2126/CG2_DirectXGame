@@ -1,7 +1,6 @@
 #include "Object3d.h"
 
 #include <cassert>
-
 #include <dxcapi.h>
 #include <cmath>
 
