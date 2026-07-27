@@ -266,9 +266,6 @@ void Object3d::CreateConstantBuffers() {
 	materialData_->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	materialData_->enableLighting = true;
 
-	// UVTransform用の行列を単位行列で初期化する
-	materialData_->uvTransform = MatrixUtility::MakeIdentity4x4();
-
 	// 平行光源用の定数バッファ作成と初期値設定
 	directionalLightResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(DirectionalLight));
 	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
