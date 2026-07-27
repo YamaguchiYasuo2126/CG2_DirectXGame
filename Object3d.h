@@ -55,6 +55,10 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
 
+	// インデックスバッファ用の変数
+	Microsoft::WRL::ComPtr<ID3D12Resource> indexResource_;
+	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
+
 	// 平行光源用のリソースとデータポインタ
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
 	DirectionalLight* directionalLightData_ = nullptr;

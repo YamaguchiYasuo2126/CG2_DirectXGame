@@ -45,6 +45,11 @@ private:
     // 頂点データ書き込み用ポインタ（Map用）
     VertexData* vertexDataSprite_ = nullptr;
 
+    // インデックスバッファ用の変数
+    Microsoft::WRL::ComPtr<ID3D12Resource> indexResourceSprite_;
+    D3D12_INDEX_BUFFER_VIEW indexBufferViewSprite_{};
+    uint32_t* indexDataSprite_ = nullptr;
+
     // Sprite用のTransformationMatrix（WVP行列）リソース
     Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite_;
     // 行列データ書き込み用ポインタ（Map用）

@@ -12,32 +12,48 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 
 
     // 頂点バッファの作成とデータ書き込み
-    // Sprite用の頂点リソースを作る（6頂点分）
-    vertexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * 6);
+    // Sprite用の頂点リソースを作る（4頂点分）
+    vertexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * 4);
 
     // 頂点バッファビューを作成する
     vertexBufferViewSprite_.BufferLocation = vertexResourceSprite_->GetGPUVirtualAddress();
-    vertexBufferViewSprite_.SizeInBytes = sizeof(VertexData) * 6;
+    // VBVのサイズ指定4頂点分
+    vertexBufferViewSprite_.SizeInBytes = sizeof(VertexData) * 4;
     vertexBufferViewSprite_.StrideInBytes = sizeof(VertexData);
 
     // データを書き込むためにMapする
     vertexResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite_));
 
-    // 1枚目の三角形（左下、左上、右下）
-    vertexDataSprite_[0].position = { 0.0f, 360.0f, 0.0f, 1.0f }; // 左下
+    // 頂点データは重複をなくし、4つ（0, 1, 2, 3）だけ定義
+    vertexDataSprite_[0].position = { 0.0f, 360.0f, 0.0f, 1.0f }; // 左下 (Index: 0)
     vertexDataSprite_[0].texcoord = { 0.0f, 1.0f };
-    vertexDataSprite_[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };   // 左上
+    vertexDataSprite_[1].position = { 0.0f, 0.0f, 0.0f, 1.0f };   // 左上 (Index: 1)
     vertexDataSprite_[1].texcoord = { 0.0f, 0.0f };
-    vertexDataSprite_[2].position = { 640.0f, 360.0f, 0.0f, 1.0f };// 右下
+    vertexDataSprite_[2].position = { 640.0f, 360.0f, 0.0f, 1.0f };// 右下 (Index: 2)
     vertexDataSprite_[2].texcoord = { 1.0f, 1.0f };
+    vertexDataSprite_[3].position = { 640.0f, 0.0f, 0.0f, 1.0f };  // 右上 (Index: 3)
+    vertexDataSprite_[3].texcoord = { 1.0f, 0.0f };
 
-    // 2枚目の三角形（左上、右上、右下）
-    vertexDataSprite_[3].position = { 0.0f, 0.0f, 0.0f, 1.0f };   // 左上
-    vertexDataSprite_[3].texcoord = { 0.0f, 0.0f };
-    vertexDataSprite_[4].position = { 640.0f, 0.0f, 0.0f, 1.0f }; // 右上
-    vertexDataSprite_[4].texcoord = { 1.0f, 0.0f };
-    vertexDataSprite_[5].position = { 640.0f, 360.0f, 0.0f, 1.0f };// 右下
-    vertexDataSprite_[5].texcoord = { 1.0f, 1.0f };
+    // Indexは6つ必要なので、要素数を6
+    indexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(uint32_t) * 6);
+
+    // IndexBufferView (IBV) の設定
+    indexBufferViewSprite_.BufferLocation = indexResourceSprite_->GetGPUVirtualAddress();
+    indexBufferViewSprite_.SizeInBytes = sizeof(uint32_t) * 6;
+    indexBufferViewSprite_.Format = DXGI_FORMAT_R32_UINT;
+
+    // データを書き込むためにMapする
+    indexResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&indexDataSprite_));
+
+    // インデックスデータの設定（三角形2枚分の頂点番号を指定）
+    // 1枚目の三角形
+    indexDataSprite_[0] = 0; // 左下
+    indexDataSprite_[1] = 1; // 左上
+    indexDataSprite_[2] = 2; // 右下
+    // 2枚目の三角形
+    indexDataSprite_[3] = 1; // 左上
+    indexDataSprite_[4] = 3; // 右上
+    indexDataSprite_[5] = 2; // 右下
 
     // TransformationMatrix（行列）バッファの作成
     // 行列1つ分のリソースを作る
@@ -95,6 +111,9 @@ void Sprite::Draw() {
     // 頂点バッファ(VBV)をSprite用のものに差し替え
     commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite_);
 
+    // インデックスバッファをセットするコマンド
+    commandList->IASetIndexBuffer(&indexBufferViewSprite_);
+
     // マテリアルCBufferの場所を設定 (0番のRootParameter)
     commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite_->GetGPUVirtualAddress());
 
@@ -104,13 +123,15 @@ void Sprite::Draw() {
     // 明示的にuvCheckerのSRVをセットする
     commandList->SetGraphicsRootDescriptorTable(2, dxCommon_->GetSrvGpuHandle(1));
 
-    // 描画（ドローコール）
-    commandList->DrawInstanced(6, 1, 0, 0);
+    // インデックスを使う
+    // (描画するインデックス数, インスタンス数, インデックスの開始位置, 頂点の開始位置, インスタンスの開始位置)
+    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
 void Sprite::Finalize() 
 {
     vertexResourceSprite_.Reset();
+    indexResourceSprite_.Reset();
     transformationMatrixResourceSprite_.Reset();
     materialResourceSprite_.Reset();
 }

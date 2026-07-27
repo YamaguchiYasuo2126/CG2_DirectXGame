@@ -31,6 +31,7 @@ void Object3d::Initialize(DirectXCommon* dxCommon, ShaderCompiler* shaderCompile
 void Object3d::Finalize() {
 	// ComPtrで管理しているDirectXリソースを明示的に解放します。
 	vertexResource_.Reset();
+	indexResource_.Reset();
 	// 配列化したテクスチャリソースをfor文で順番に解放する
 	for (uint32_t i = 0; i < 2; ++i)
 	{
@@ -72,6 +73,8 @@ void Object3d::Draw() {
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
+	// インデックスバッファをセット
+	commandList->IASetIndexBuffer(&indexBufferView_);
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
@@ -81,7 +84,7 @@ void Object3d::Draw() {
 
 	// 変数を見て利用するSRVを決める（trueなら1番(モンスターボール)、falseなら0番(uvChecker)）
 	commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall_ ? textureSrvHandleGPUs_[1] : textureSrvHandleGPUs_[0]);
-	commandList->DrawInstanced(1536, 1, 0, 0);
+	commandList->DrawIndexedInstanced(1536, 1, 0, 0, 0);
 }
 
 void Object3d::DrawImGui() {
@@ -93,8 +96,12 @@ void Object3d::DrawImGui() {
 	// 切り替え用のチェックボックス
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall_);
 
+	// 最初から開かれていて、ハイライトされている状態
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_Selected;
+
 	// ライトの設定
-	if (ImGui::TreeNode("Directional Light")) {
+	if (ImGui::TreeNodeEx("Directional Light", flags))
+	{
 		ImGui::ColorEdit4("Color", &directionalLightData_->color.x);
 
 		// 向きの変更
@@ -299,7 +306,10 @@ void Object3d::CreateVertexBuffer()
 {
 	// 分割数と総頂点数の定義
 	const uint32_t kSubdivision = 16;
-	const uint32_t kVertexCount = kSubdivision * kSubdivision * 6;
+	// 頂点数は (経度分割数 + 1) * (緯度分割数 + 1) になります
+	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
+	// インデックス数は今までと同じ 16 * 16 * 6 = 1536個
+	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6;
 
 	// 球に必要な頂点数分のバッファを作成
 	vertexResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * kVertexCount);
@@ -311,53 +321,62 @@ void Object3d::CreateVertexBuffer()
 	VertexData* vertexData = nullptr;
 	vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
+	// インデックスバッファの作成
+	indexResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(uint32_t) * kIndexCount);
+	indexBufferView_.BufferLocation = indexResource_->GetGPUVirtualAddress();
+	indexBufferView_.SizeInBytes = sizeof(uint32_t) * kIndexCount;
+	indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
+
+	uint32_t* indexData = nullptr;
+	indexResource_->Map(0, nullptr, reinterpret_cast<void**>(&indexData));
+
 	// 経度(lon)と緯度(lat)の1分割あたりの角度を求めます。
 	const float pi = 3.141592654f;
 	const float kLonEvery = pi * 2.0f / float(kSubdivision);
 	const float kLatEvery = pi / float(kSubdivision);
 
-	// 緯度の方向に分割
-	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex) {
-		float lat = -pi / 2.0f + kLatEvery * latIndex; // 現在の緯度 (θ)
+	// 緯度の方向に分割 (<= にすることで端の頂点も含める)
+	for (uint32_t latIndex = 0; latIndex <= kSubdivision; ++latIndex)
+	{
+		float lat = -pi / 2.0f + kLatEvery * latIndex;
+		float v = 1.0f - float(latIndex) / float(kSubdivision);
 
-		// 経度の方向に分割しながら線を描く
-		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex) {
-			uint32_t start = (latIndex * kSubdivision + lonIndex) * 6;
-			float lon = lonIndex * kLonEvery; // 現在の経度 (φ)
+		// 経度の方向に分割
+		for (uint32_t lonIndex = 0; lonIndex <= kSubdivision; ++lonIndex) 
+		{
+			// 配列のインデックス計算
+			uint32_t index = latIndex * (kSubdivision + 1) + lonIndex;
+			float lon = lonIndex * kLonEvery;
+			float u = float(lonIndex) / float(kSubdivision);
 
-			// 1つの四角形を構成する4頂点(a, b, c, d)のUV座標を計算
-			float u_a = float(lonIndex) / float(kSubdivision);
-			float v_a = 1.0f - float(latIndex) / float(kSubdivision);
-			float u_b = u_a;
-			float v_b = 1.0f - float(latIndex + 1) / float(kSubdivision);
-			float u_c = float(lonIndex + 1) / float(kSubdivision);
-			float v_c = v_a;
-			float u_d = u_c;
-			float v_d = v_b;
+			vertexData[index].position = { std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon), 1.0f };
+			vertexData[index].texcoord = { u, v };
+			vertexData[index].normal = { vertexData[index].position.x, vertexData[index].position.y, vertexData[index].position.z };
+		}
+	}
 
-			// --- 1枚目の三角形 (a, b, c) ---
-			// 基準点 a (左下)
-			vertexData[start].position = { std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon), 1.0f };
-			vertexData[start].texcoord = { u_a, v_a };
-			vertexData[start].normal = { vertexData[start].position.x, vertexData[start].position.y, vertexData[start].position.z };
-			// 点 b (左上)
-			vertexData[start + 1].position = { std::cos(lat + kLatEvery) * std::cos(lon), std::sin(lat + kLatEvery), std::cos(lat + kLatEvery) * std::sin(lon), 1.0f };
-			vertexData[start + 1].texcoord = { u_b, v_b };
-			vertexData[start + 1].normal = { vertexData[start + 1].position.x, vertexData[start + 1].position.y, vertexData[start + 1].position.z };
-			// 点 c (右下)
-			vertexData[start + 2].position = { std::cos(lat) * std::cos(lon + kLonEvery), std::sin(lat), std::cos(lat) * std::sin(lon + kLonEvery), 1.0f };
-			vertexData[start + 2].texcoord = { u_c, v_c };
-			vertexData[start + 2].normal = { vertexData[start + 2].position.x, vertexData[start + 2].position.y, vertexData[start + 2].position.z };
+	// インデックスデータを書き込む
+	uint32_t indexOffset = 0;
+	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
+	{
+		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
+		{
+			// 四角形を構成する4頂点のインデックス番号を計算
+			uint32_t start = latIndex * (kSubdivision + 1) + lonIndex;
+			uint32_t a = start;                                // 左下
+			uint32_t b = start + (kSubdivision + 1);           // 左上
+			uint32_t c = start + 1;                            // 右下
+			uint32_t d = start + (kSubdivision + 1) + 1;       // 右上
 
-			// --- 2枚目の三角形 (c, b, d) ---
-			// 点 c (右下)
-			vertexData[start + 3] = vertexData[start + 2];
-			// 点 b (左上)
-			vertexData[start + 4] = vertexData[start + 1];
-			// 点 d (右上)
-			vertexData[start + 5].position = { std::cos(lat + kLatEvery) * std::cos(lon + kLonEvery), std::sin(lat + kLatEvery), std::cos(lat + kLatEvery) * std::sin(lon + kLonEvery), 1.0f };
-			vertexData[start + 5].texcoord = { u_d, v_d };
-			vertexData[start + 5].normal = { vertexData[start + 5].position.x, vertexData[start + 5].position.y, vertexData[start + 5].position.z };
+			// 1枚目の三角形 (a, b, c)
+			indexData[indexOffset++] = a;
+			indexData[indexOffset++] = b;
+			indexData[indexOffset++] = c;
+
+			// 2枚目の三角形 (c, b, d)
+			indexData[indexOffset++] = c;
+			indexData[indexOffset++] = b;
+			indexData[indexOffset++] = d;
 		}
 	}
 }
