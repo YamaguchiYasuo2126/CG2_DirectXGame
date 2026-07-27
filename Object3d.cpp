@@ -78,7 +78,7 @@ void Object3d::Draw() {
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
-	
+
 	// 3番のRootParameter（平行光源用）を設定
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
 
@@ -261,10 +261,13 @@ void Object3d::CreateConstantBuffers() {
 	// マテリアル色用の定数バッファです。初期値は白にしています。
 	materialResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Material));
 	materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-	
+
 	// Vector4を直接代入するのではなく、メンバ変数(colorとenableLighting)それぞれに代入
 	materialData_->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
 	materialData_->enableLighting = true;
+
+	// UVTransform用の行列を単位行列で初期化する
+	materialData_->uvTransform = MatrixUtility::MakeIdentity4x4();
 
 	// 平行光源用の定数バッファ作成と初期値設定
 	directionalLightResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(DirectionalLight));
@@ -342,7 +345,7 @@ void Object3d::CreateVertexBuffer()
 		float v = 1.0f - float(latIndex) / float(kSubdivision);
 
 		// 経度の方向に分割
-		for (uint32_t lonIndex = 0; lonIndex <= kSubdivision; ++lonIndex) 
+		for (uint32_t lonIndex = 0; lonIndex <= kSubdivision; ++lonIndex)
 		{
 			// 配列のインデックス計算
 			uint32_t index = latIndex * (kSubdivision + 1) + lonIndex;

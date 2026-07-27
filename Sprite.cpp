@@ -61,7 +61,7 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 
     // データを書き込むためにMapする
     transformationMatrixResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite_));
-     
+
     // 初期値として単位行列を書き込んでおく
     transformationMatrixDataSprite_->WVP = MatrixUtility::MakeIdentity4x4();
     transformationMatrixDataSprite_->World = MatrixUtility::MakeIdentity4x4();
@@ -77,6 +77,9 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 
     // SpriteはLightingしないのでfalseを設定する
     materialDataSprite_->enableLighting = false;
+
+    // UVTransform行列を単位行列で初期化
+    materialDataSprite_->uvTransform = MatrixUtility::MakeIdentity4x4();
 }
 
 void Sprite::Update() {
@@ -101,6 +104,13 @@ void Sprite::Update() {
     // バッファに書き込む
     transformationMatrixDataSprite_->WVP = worldViewProjectionMatrixSprite;
     transformationMatrixDataSprite_->World = worldMatrixSprite;
+
+    // パラメータからUVTransform用の行列を生成する
+    Matrix4x4 uvTransformMatrix = MatrixUtility::MakeScaleMatrix(uvTransformSprite_.scale);
+    uvTransformMatrix = MatrixUtility::Multiply(uvTransformMatrix, MatrixUtility::MakeRotateZMatrix(uvTransformSprite_.rotate.z));
+    uvTransformMatrix = MatrixUtility::Multiply(uvTransformMatrix, MatrixUtility::MakeTranslateMatrix(uvTransformSprite_.translate));
+
+    materialDataSprite_->uvTransform = uvTransformMatrix;
 }
 
 void Sprite::Draw() {
@@ -128,7 +138,7 @@ void Sprite::Draw() {
     commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
-void Sprite::Finalize() 
+void Sprite::Finalize()
 {
     vertexResourceSprite_.Reset();
     indexResourceSprite_.Reset();
@@ -136,13 +146,18 @@ void Sprite::Finalize()
     materialResourceSprite_.Reset();
 }
 
-void Sprite::DrawImGui() 
+void Sprite::DrawImGui()
 {
 #ifdef USE_IMGUI
     ImGui::Begin("Settings");
 
     // transformSprite_ の translate (平行移動) の X, Y, Z をいじれるようにする
     ImGui::DragFloat3("translateSprite", &transformSprite_.translate.x, 1.0f);
+
+    // UVTransformのパラメータ編集用
+    ImGui::DragFloat2("UVTranslate", &uvTransformSprite_.translate.x, 0.01f, -10.0f, 10.0f);
+    ImGui::DragFloat2("UVScale", &uvTransformSprite_.scale.x, 0.01f, -10.0f, 10.0f);
+    ImGui::SliderAngle("UVRotate", &uvTransformSprite_.rotate.z);
 
     ImGui::End();
 #endif
