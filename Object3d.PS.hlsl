@@ -30,14 +30,16 @@ PixelShaderOutput main(VertexShaderOutput input) {
     
     if (gMaterial.enableLighting != 0)
     { 
-        // Lightingする場合、法線を再度正規化し、ライトの逆方向と内積をとってcosθを求める
-        float cos = saturate(dot(normalize(input.normal), -gDirectionalLight.direction));
+        // Half Lambert
+        float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
+        float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
         
         // 最終的な色 = マテリアル色 × テクスチャ色 × ライト色 × cosθ × 輝度
         output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
     }
     else
-    { // Lightingしない場合 (前回までと同じ演算)
+    { 
+        // Lightingしない場合 (前回までと同じ演算)
         output.color = gMaterial.color * textureColor;
     }
     
