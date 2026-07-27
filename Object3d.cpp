@@ -64,6 +64,10 @@ void Object3d::Update() {
 	Matrix4x4 worldViewProjectionMatrix = MatrixUtility::Multiply(worldMatrix, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
 	wvpData_->WVP = worldViewProjectionMatrix;
 	wvpData_->World = worldMatrix;
+
+	// UVTransformの行列計算と定数バッファへの代入
+	Matrix4x4 uvTransformMatrix = MatrixUtility::MakeAffineMatrix(uvTransform_.scale, uvTransform_.rotate, uvTransform_.translate);
+	materialData_->uvTransform = uvTransformMatrix;
 }
 
 void Object3d::Draw() {
