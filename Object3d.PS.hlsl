@@ -4,6 +4,8 @@ struct Material
 {
     float4 color;
     int32_t enableLighting;
+    // C++側の float padding[3]; に対応させるための隙間
+    float3 padding;
     float4x4 uvTransform;
 };
 
