@@ -39,6 +39,7 @@
     <ClCompile Include="Logger.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MatrixUtility.cpp" />
+    <ClCompile Include="ModelLoader.cpp" />
     <ClCompile Include="Object3d.cpp" />
     <ClCompile Include="ShaderCompiler.cpp" />
     <ClCompile Include="Sprite.cpp" />
@@ -60,9 +61,12 @@
     <ClInclude Include="GameApplication.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="MaterialData.h" />
     <ClInclude Include="Matrix3x3.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="MatrixUtility.h" />
+    <ClInclude Include="ModelData.h" />
+    <ClInclude Include="ModelLoader.h" />
     <ClInclude Include="Object3d.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="Sprite.h" />

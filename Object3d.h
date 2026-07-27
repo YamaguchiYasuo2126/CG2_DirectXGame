@@ -15,6 +15,8 @@
 #include "Material.h"
 #include "TransformationMatrix.h"
 #include "DirectionalLight.h"
+#include "ModelData.h"
+#include "ModelLoader.h"
 
 class DirectXCommon;
 class Logger;
@@ -72,9 +74,12 @@ private:
 	std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> textureSrvHandleGPUs_{};
 
 	// 切り替え用のbool変数を用意する
-	bool useMonsterBall_ = true;
+	bool useMonsterBall_ = false;
 
 	// オブジェクト自身とカメラのTransform
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
+
+	// 読み込んだモデルデータを保持する変数
+	ModelData modelData_;
 };

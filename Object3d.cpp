@@ -51,8 +51,8 @@ void Object3d::Finalize() {
 }
 
 void Object3d::Update() {
-	// 毎フレーム少しずつ回転させ、WVP行列を定数バッファへ書き込みます。
-	transform_.rotate.y += 0.03f;
+	// WVP行列を定数バッファへ書き込みます。
+	
 	Matrix4x4 worldMatrix = MatrixUtility::MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
 	Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(cameraTransform_.scale, cameraTransform_.rotate, cameraTransform_.translate);
 	Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
@@ -83,13 +83,20 @@ void Object3d::Draw() {
 
 	// 変数を見て利用するSRVを決める（trueなら1番(モンスターボール)、falseなら0番(uvChecker)）
 	commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall_ ? textureSrvHandleGPUs_[1] : textureSrvHandleGPUs_[0]);
-	commandList->DrawIndexedInstanced(1536, 1, 0, 0, 0);
+	// 描画する頂点数はmodelData_.vertices.size()を指定
+	commandList->DrawInstanced(UINT(modelData_.vertices.size()), 1, 0, 0);
 }
 
 void Object3d::DrawImGui() {
 #ifdef USE_IMGUI
 	// マテリアル色をImGuiから編集できるようにします。
 	ImGui::Begin("Settings");
+
+	// モデル（Sphere）の回転をImGuiで操作できるようにする
+	ImGui::SliderAngle("SphereRotateX", &transform_.rotate.x);
+	ImGui::SliderAngle("SphereRotateY", &transform_.rotate.y);
+	ImGui::SliderAngle("SphereRotateZ", &transform_.rotate.z);
+
 	ImGui::ColorEdit4("material", &materialData_->color.x);
 
 	// 切り替え用のチェックボックス
@@ -107,8 +114,6 @@ void Object3d::DrawImGui() {
 		ImGui::DragFloat3("Direction", &directionalLightData_->direction.x, 0.01f, -1.0f, 1.0f);
 
 		// 正規化（ベクトルの長さを1にする）
-		// ※Vector3クラスにNormalize()のような関数があればそれを使ってください。
-		// なければ以下のように手動で計算するか、Utility関数を作ると便利です。
 		float len = std::sqrt(
 			directionalLightData_->direction.x * directionalLightData_->direction.x +
 			directionalLightData_->direction.y * directionalLightData_->direction.y +
@@ -204,7 +209,7 @@ void Object3d::CreatePipelineState() {
 	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	inputElementDescs[2].SemanticName = "NORMAL";
 	inputElementDescs[2].SemanticIndex = 0;
-	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
 	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs;
@@ -304,81 +309,27 @@ void Object3d::CreateTexture() {
 		textureSrvHandleGPUs_[i] = dxCommon_->GetSrvGpuHandle(i + 1);
 	}
 }
+
 void Object3d::CreateVertexBuffer()
 {
-	// 分割数と総頂点数の定義
-	const uint32_t kSubdivision = 16;
-	// 頂点数は (経度分割数 + 1) * (緯度分割数 + 1) になります
-	const uint32_t kVertexCount = (kSubdivision + 1) * (kSubdivision + 1);
-	// インデックス数は今までと同じ 16 * 16 * 6 = 1536個
-	const uint32_t kIndexCount = kSubdivision * kSubdivision * 6;
+	// モデルファイルの読み込み
+	modelData_ = ModelLoader::LoadObjFile("resources", "plane.obj");
 
-	// 球に必要な頂点数分のバッファを作成
-	vertexResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * kVertexCount);
+	// 頂点バッファの作成 (頂点数 × VertexDataのサイズ)
+	vertexResource_ = DirectXResource::CreateBufferResource(
+		dxCommon_->GetDevice(),
+		sizeof(VertexData) * modelData_.vertices.size()
+	);
 
+	// 頂点バッファビューの設定
 	vertexBufferView_.BufferLocation = vertexResource_->GetGPUVirtualAddress();
-	vertexBufferView_.SizeInBytes = sizeof(VertexData) * kVertexCount;
+	vertexBufferView_.SizeInBytes = UINT(sizeof(VertexData) * modelData_.vertices.size());
 	vertexBufferView_.StrideInBytes = sizeof(VertexData);
 
+	// 頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
 	vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-	// インデックスバッファの作成
-	indexResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(uint32_t) * kIndexCount);
-	indexBufferView_.BufferLocation = indexResource_->GetGPUVirtualAddress();
-	indexBufferView_.SizeInBytes = sizeof(uint32_t) * kIndexCount;
-	indexBufferView_.Format = DXGI_FORMAT_R32_UINT;
-
-	uint32_t* indexData = nullptr;
-	indexResource_->Map(0, nullptr, reinterpret_cast<void**>(&indexData));
-
-	// 経度(lon)と緯度(lat)の1分割あたりの角度を求めます。
-	const float pi = 3.141592654f;
-	const float kLonEvery = pi * 2.0f / float(kSubdivision);
-	const float kLatEvery = pi / float(kSubdivision);
-
-	// 緯度の方向に分割 (<= にすることで端の頂点も含める)
-	for (uint32_t latIndex = 0; latIndex <= kSubdivision; ++latIndex)
-	{
-		float lat = -pi / 2.0f + kLatEvery * latIndex;
-		float v = 1.0f - float(latIndex) / float(kSubdivision);
-
-		// 経度の方向に分割
-		for (uint32_t lonIndex = 0; lonIndex <= kSubdivision; ++lonIndex)
-		{
-			// 配列のインデックス計算
-			uint32_t index = latIndex * (kSubdivision + 1) + lonIndex;
-			float lon = lonIndex * kLonEvery;
-			float u = float(lonIndex) / float(kSubdivision);
-
-			vertexData[index].position = { std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon), 1.0f };
-			vertexData[index].texcoord = { u, v };
-			vertexData[index].normal = { vertexData[index].position.x, vertexData[index].position.y, vertexData[index].position.z };
-		}
-	}
-
-	// インデックスデータを書き込む
-	uint32_t indexOffset = 0;
-	for (uint32_t latIndex = 0; latIndex < kSubdivision; ++latIndex)
-	{
-		for (uint32_t lonIndex = 0; lonIndex < kSubdivision; ++lonIndex)
-		{
-			// 四角形を構成する4頂点のインデックス番号を計算
-			uint32_t start = latIndex * (kSubdivision + 1) + lonIndex;
-			uint32_t a = start;                                // 左下
-			uint32_t b = start + (kSubdivision + 1);           // 左上
-			uint32_t c = start + 1;                            // 右下
-			uint32_t d = start + (kSubdivision + 1) + 1;       // 右上
-
-			// 1枚目の三角形 (a, b, c)
-			indexData[indexOffset++] = a;
-			indexData[indexOffset++] = b;
-			indexData[indexOffset++] = c;
-
-			// 2枚目の三角形 (c, b, d)
-			indexData[indexOffset++] = c;
-			indexData[indexOffset++] = b;
-			indexData[indexOffset++] = d;
-		}
-	}
+	// memcpyを使って、modelDataの中身を一気にコピー
+	std::memcpy(vertexData, modelData_.vertices.data(), sizeof(VertexData) * modelData_.vertices.size());
 }

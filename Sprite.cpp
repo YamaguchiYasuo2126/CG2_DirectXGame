@@ -135,7 +135,7 @@ void Sprite::Draw() {
 
     // インデックスを使う
     // (描画するインデックス数, インスタンス数, インデックスの開始位置, 頂点の開始位置, インスタンスの開始位置)
-    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+    //commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
 void Sprite::Finalize()
