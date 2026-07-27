@@ -60,6 +60,7 @@
     <ClInclude Include="GameApplication.h" />
     <ClInclude Include="Logger.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="Matrix3x3.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="MatrixUtility.h" />
     <ClInclude Include="Object3d.h" />

@@ -58,4 +58,12 @@ private:
     // --- Transform関連 ---
     // CPUで動かす用のTransform（初期位置、回転、スケール）
     Transform transformSprite_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
+
+    // UVTransform用の変数
+    Transform uvTransformSprite_
+    {
+        {1.0f, 1.0f, 1.0f},
+        {0.0f, 0.0f, 0.0f},
+        {0.0f, 0.0f, 0.0f}
+    };
 };
