@@ -38,6 +38,7 @@ void Object3d::Finalize() {
 	}
 	materialResource_.Reset();
 	wvpResource_.Reset();
+	directionalLightResource_.Reset();
 	graphicsPipelineState_.Reset();
 	pixelShaderBlob_.Reset();
 	vertexShaderBlob_.Reset();
@@ -61,7 +62,8 @@ void Object3d::Update() {
 		0.1f,
 		100.0f);
 	Matrix4x4 worldViewProjectionMatrix = MatrixUtility::Multiply(worldMatrix, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
-	*wvpData_ = worldViewProjectionMatrix;
+	wvpData_->WVP = worldViewProjectionMatrix;
+	wvpData_->World = worldMatrix;
 }
 
 void Object3d::Draw() {
@@ -73,6 +75,10 @@ void Object3d::Draw() {
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
+	
+	// 3番のRootParameter（平行光源用）を設定
+	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
+
 	// 変数を見て利用するSRVを決める（trueなら1番(モンスターボール)、falseなら0番(uvChecker)）
 	commandList->SetGraphicsRootDescriptorTable(2, useMonsterBall_ ? textureSrvHandleGPUs_[1] : textureSrvHandleGPUs_[0]);
 	commandList->DrawInstanced(1536, 1, 0, 0);
@@ -82,12 +88,37 @@ void Object3d::DrawImGui() {
 #ifdef USE_IMGUI
 	// マテリアル色をImGuiから編集できるようにします。
 	ImGui::Begin("Settings");
-	ImGui::ColorEdit4("material", &materialData_->x);
+	ImGui::ColorEdit4("material", &materialData_->color.x);
 
-	
-	
 	// 切り替え用のチェックボックス
 	ImGui::Checkbox("useMonsterBall", &useMonsterBall_);
+
+	// ライトの設定
+	if (ImGui::TreeNode("Directional Light")) {
+		ImGui::ColorEdit4("Color", &directionalLightData_->color.x);
+
+		// 向きの変更
+		ImGui::DragFloat3("Direction", &directionalLightData_->direction.x, 0.01f, -1.0f, 1.0f);
+
+		// 正規化（ベクトルの長さを1にする）
+		// ※Vector3クラスにNormalize()のような関数があればそれを使ってください。
+		// なければ以下のように手動で計算するか、Utility関数を作ると便利です。
+		float len = std::sqrt(
+			directionalLightData_->direction.x * directionalLightData_->direction.x +
+			directionalLightData_->direction.y * directionalLightData_->direction.y +
+			directionalLightData_->direction.z * directionalLightData_->direction.z
+		);
+		if (len > 0.0f) {
+			directionalLightData_->direction.x /= len;
+			directionalLightData_->direction.y /= len;
+			directionalLightData_->direction.z /= len;
+		}
+
+		// 輝度の変更
+		ImGui::DragFloat("Intensity", &directionalLightData_->intensity, 0.01f);
+
+		ImGui::TreePop();
+	}
 
 	ImGui::End();
 #endif
@@ -101,7 +132,7 @@ void Object3d::CreateRootSignature() {
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParameters[3] = {};
+	D3D12_ROOT_PARAMETER rootParameters[4] = {};
 	// 0番: PixelShader用マテリアル色、1番: VertexShader用WVP行列。
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
@@ -113,6 +144,9 @@ void Object3d::CreateRootSignature() {
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRange;
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
+	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;       // CBVを使う
+	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;    // PixelShaderで使う
+	rootParameters[3].Descriptor.ShaderRegister = 1;                       // レジスタ番号1を使
 
 	// Textureのサンプリング方法をRootSignatureに固定で持たせます。
 	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
@@ -153,7 +187,7 @@ void Object3d::CreateRootSignature() {
 
 void Object3d::CreatePipelineState() {
 	// 頂点データの並びをShaderの入力セマンティクスへ対応付けます。
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[2] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
 	inputElementDescs[0].SemanticName = "POSITION";
 	inputElementDescs[0].SemanticIndex = 0;
 	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
@@ -162,6 +196,10 @@ void Object3d::CreatePipelineState() {
 	inputElementDescs[1].SemanticIndex = 0;
 	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
 	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDescs[2].SemanticName = "NORMAL";
+	inputElementDescs[2].SemanticIndex = 0;
+	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
 	D3D12_INPUT_LAYOUT_DESC inputLayoutDesc{};
 	inputLayoutDesc.pInputElementDescs = inputElementDescs;
 	inputLayoutDesc.NumElements = _countof(inputElementDescs);
@@ -208,14 +246,27 @@ void Object3d::CreatePipelineState() {
 
 void Object3d::CreateConstantBuffers() {
 	// WVP行列用の定数バッファを作り、CPUから直接書き込めるようMapします。
-	wvpResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Matrix4x4));
+	wvpResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(TransformationMatrix));
 	wvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&wvpData_));
-	*wvpData_ = MatrixUtility::MakeIdentity4x4();
+	wvpData_->WVP = MatrixUtility::MakeIdentity4x4();
+	wvpData_->World = MatrixUtility::MakeIdentity4x4();
 
 	// マテリアル色用の定数バッファです。初期値は白にしています。
-	materialResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Vector4));
+	materialResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Material));
 	materialResource_->Map(0, nullptr, reinterpret_cast<void**>(&materialData_));
-	*materialData_ = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	
+	// Vector4を直接代入するのではなく、メンバ変数(colorとenableLighting)それぞれに代入
+	materialData_->color = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+	materialData_->enableLighting = true;
+
+	// 平行光源用の定数バッファ作成と初期値設定
+	directionalLightResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(DirectionalLight));
+	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
+
+	// デフォルト値
+	directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData_->intensity = 1.0f;
 }
 
 void Object3d::CreateTexture() {
@@ -244,7 +295,7 @@ void Object3d::CreateTexture() {
 		textureSrvHandleGPUs_[i] = dxCommon_->GetSrvGpuHandle(i + 1);
 	}
 }
-void Object3d::CreateVertexBuffer() 
+void Object3d::CreateVertexBuffer()
 {
 	// 分割数と総頂点数の定義
 	const uint32_t kSubdivision = 16;
@@ -288,12 +339,15 @@ void Object3d::CreateVertexBuffer()
 			// 基準点 a (左下)
 			vertexData[start].position = { std::cos(lat) * std::cos(lon), std::sin(lat), std::cos(lat) * std::sin(lon), 1.0f };
 			vertexData[start].texcoord = { u_a, v_a };
+			vertexData[start].normal = { vertexData[start].position.x, vertexData[start].position.y, vertexData[start].position.z };
 			// 点 b (左上)
 			vertexData[start + 1].position = { std::cos(lat + kLatEvery) * std::cos(lon), std::sin(lat + kLatEvery), std::cos(lat + kLatEvery) * std::sin(lon), 1.0f };
 			vertexData[start + 1].texcoord = { u_b, v_b };
+			vertexData[start + 1].normal = { vertexData[start + 1].position.x, vertexData[start + 1].position.y, vertexData[start + 1].position.z };
 			// 点 c (右下)
 			vertexData[start + 2].position = { std::cos(lat) * std::cos(lon + kLonEvery), std::sin(lat), std::cos(lat) * std::sin(lon + kLonEvery), 1.0f };
 			vertexData[start + 2].texcoord = { u_c, v_c };
+			vertexData[start + 2].normal = { vertexData[start + 2].position.x, vertexData[start + 2].position.y, vertexData[start + 2].position.z };
 
 			// --- 2枚目の三角形 (c, b, d) ---
 			// 点 c (右下)
@@ -303,6 +357,7 @@ void Object3d::CreateVertexBuffer()
 			// 点 d (右上)
 			vertexData[start + 5].position = { std::cos(lat + kLatEvery) * std::cos(lon + kLonEvery), std::sin(lat + kLatEvery), std::cos(lat + kLatEvery) * std::sin(lon + kLonEvery), 1.0f };
 			vertexData[start + 5].texcoord = { u_d, v_d };
+			vertexData[start + 5].normal = { vertexData[start + 5].position.x, vertexData[start + 5].position.y, vertexData[start + 5].position.z };
 		}
 	}
 }

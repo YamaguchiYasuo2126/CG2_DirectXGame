@@ -41,13 +41,26 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 
     // TransformationMatrix（行列）バッファの作成
     // 行列1つ分のリソースを作る
-    transformationMatrixResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Matrix4x4));
+    transformationMatrixResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(TransformationMatrix));
 
     // データを書き込むためにMapする
     transformationMatrixResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite_));
      
     // 初期値として単位行列を書き込んでおく
-    *transformationMatrixDataSprite_ = MatrixUtility::MakeIdentity4x4();
+    transformationMatrixDataSprite_->WVP = MatrixUtility::MakeIdentity4x4();
+    transformationMatrixDataSprite_->World = MatrixUtility::MakeIdentity4x4();
+
+    // Sprite用のマテリアルリソースを作る
+    materialResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Material));
+
+    // データを書き込むためにMapする
+    materialResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite_));
+
+    // 色は白を設定しておく
+    materialDataSprite_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+    // SpriteはLightingしないのでfalseを設定する
+    materialDataSprite_->enableLighting = false;
 }
 
 void Sprite::Update() {
@@ -70,7 +83,8 @@ void Sprite::Update() {
     Matrix4x4 worldViewProjectionMatrixSprite = MatrixUtility::Multiply(worldMatrixSprite, MatrixUtility::Multiply(viewMatrixSprite, projectionMatrixSprite));
 
     // バッファに書き込む
-    *transformationMatrixDataSprite_ = worldViewProjectionMatrixSprite;
+    transformationMatrixDataSprite_->WVP = worldViewProjectionMatrixSprite;
+    transformationMatrixDataSprite_->World = worldMatrixSprite;
 }
 
 void Sprite::Draw() {
@@ -80,6 +94,9 @@ void Sprite::Draw() {
     // Spriteの描画（変更が必要なものだけ設定する）
     // 頂点バッファ(VBV)をSprite用のものに差し替え
     commandList->IASetVertexBuffers(0, 1, &vertexBufferViewSprite_);
+
+    // マテリアルCBufferの場所を設定 (0番のRootParameter)
+    commandList->SetGraphicsRootConstantBufferView(0, materialResourceSprite_->GetGPUVirtualAddress());
 
     // 1番のRootParameter（VertexShaderのWVP行列用）をSprite用のバッファに差し替え
     commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite_->GetGPUVirtualAddress());
@@ -95,6 +112,7 @@ void Sprite::Finalize()
 {
     vertexResourceSprite_.Reset();
     transformationMatrixResourceSprite_.Reset();
+    materialResourceSprite_.Reset();
 }
 
 void Sprite::DrawImGui() 

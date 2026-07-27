@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConvertString.h" />
+    <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="DirectXCommon.h" />
     <ClInclude Include="DirectXResource.h" />
     <ClInclude Include="externals\imgui\imconfig.h" />
@@ -58,12 +59,14 @@
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="GameApplication.h" />
     <ClInclude Include="Logger.h" />
+    <ClInclude Include="Material.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="MatrixUtility.h" />
     <ClInclude Include="Object3d.h" />
     <ClInclude Include="ShaderCompiler.h" />
     <ClInclude Include="Sprite.h" />
     <ClInclude Include="Transform.h" />
+    <ClInclude Include="TransformationMatrix.h" />
     <ClInclude Include="VertexData.h" />
     <ClInclude Include="Vector2.h" />
     <ClInclude Include="Vector3.h" />

@@ -7,6 +7,8 @@
 #include "Matrix4x4.h"
 #include "Transform.h"
 #include "VertexData.h"
+#include "Material.h"
+#include "TransformationMatrix.h"
 
 // DirectXCommonクラスの前方宣言（ポインタとして受け取るため）
 class DirectXCommon;
@@ -31,6 +33,10 @@ private:
     // 描画コマンド発行やデバイス取得に使う共通クラス
     DirectXCommon* dxCommon_ = nullptr;
 
+    // Sprite用のマテリアルリソースとデータポインタ
+    Microsoft::WRL::ComPtr<ID3D12Resource> materialResourceSprite_;
+    Material* materialDataSprite_ = nullptr;
+
     // --- リソース関連 ---
     // Sprite用の頂点リソース（三角形2枚分）
     Microsoft::WRL::ComPtr<ID3D12Resource> vertexResourceSprite_;
@@ -42,7 +48,7 @@ private:
     // Sprite用のTransformationMatrix（WVP行列）リソース
     Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResourceSprite_;
     // 行列データ書き込み用ポインタ（Map用）
-    Matrix4x4* transformationMatrixDataSprite_ = nullptr;
+    TransformationMatrix* transformationMatrixDataSprite_ = nullptr;
 
     // --- Transform関連 ---
     // CPUで動かす用のTransform（初期位置、回転、スケール）

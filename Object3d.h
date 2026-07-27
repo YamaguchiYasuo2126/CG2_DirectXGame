@@ -12,10 +12,14 @@
 #include "Transform.h"
 #include "Vector4.h"
 #include "VertexData.h"
+#include "Material.h"
+#include "TransformationMatrix.h"
+#include "DirectionalLight.h"
 
 class DirectXCommon;
 class Logger;
 class ShaderCompiler;
+
 
 // テクスチャ付き3Dオブジェクトの初期化、更新、描画を担当します。
 class Object3d {
@@ -50,8 +54,13 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource_;
-	Matrix4x4* wvpData_ = nullptr;
-	Vector4* materialData_ = nullptr;
+
+	// 平行光源用のリソースとデータポインタ
+	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
+	DirectionalLight* directionalLightData_ = nullptr;
+
+	TransformationMatrix* wvpData_ = nullptr;
+	Material* materialData_ = nullptr;
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 
 	// テクスチャリソースとSRVハンドルを2つ持つように配列化
