@@ -62,7 +62,6 @@ void DirectXCommon::Finalize() {
 	debugController_.Reset();
 #endif
 
-	ReportLiveObjects();
 	logger_ = nullptr;
 }
 

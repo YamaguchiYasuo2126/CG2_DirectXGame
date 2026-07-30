@@ -74,7 +74,7 @@ private:
 	std::array<D3D12_GPU_DESCRIPTOR_HANDLE, 2> textureSrvHandleGPUs_{};
 
 	// 切り替え用のbool変数を用意する
-	bool useMonsterBall_ = false;
+	bool useMonsterBall_ = true;
 
 	// オブジェクト自身とカメラのTransform
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
