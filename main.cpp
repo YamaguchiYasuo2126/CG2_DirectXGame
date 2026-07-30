@@ -4,6 +4,12 @@
 
 #pragma comment(lib, "xaudio2.lib")
 
+#define DIRECTINPUT_VERSION 0x0800 // DirectInputのバージョン指定
+#include <dinput.h>
+
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+
 #include "GameApplication.h"
 #include "D3DResourceLeakChecker.h"
 
@@ -167,11 +173,35 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	GameApplication application;
 	application.Initialize();
 
+	
+
 	HRESULT hr = XAudio2Create(&xAudio2, 0, XAUDIO2_DEFAULT_SAMPLERATE);
 
 	hr = xAudio2->CreateMasteringVoice(&masterVoice);
 
 	SoundPlayWave(xAudio2.Get(), soundData1);
+	
+	// DirectInputの初期化
+	IDirectInput8* directInput = nullptr;
+	
+	hr = DirectInput8Create(
+		w.hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8,
+		(void**)&directInput, nullptr);
+	assert(SUCCEEDED(hr));
+
+	// キーボードデバイスの生成
+	IDirectInputDevice8* keyboard = nullptr;
+	hr = directInput->CreateDevice(GUID_SysKeyboard, &keyboard, NULL);
+	assert(SUCCEEDED(hr));
+
+	// 入力データ形式のセット
+	hr = keyboard->SetDataFormat(&c_dfDIKeyboard); // 標準形式
+	assert(SUCCEEDED(hr));
+
+	// 排他制御レベルのセット
+	hr = keyboard->SetCooperativeLevel(
+		hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+	assert(SUCCEEDED(hr));
 
 	application.Run();
 
