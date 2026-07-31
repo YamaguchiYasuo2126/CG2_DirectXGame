@@ -49,7 +49,7 @@ void DebugCamera::Update(Input* input) {
 	Matrix4x4 matRot = MatrixUtility::Multiply(matRotX, MatrixUtility::Multiply(matRotY, matRotZ));
 
 	// 移動処理
-	const float kMoveSpeed = 0.5f;
+	const float kMoveSpeed = 0.1f;
 	Vector3 move = { 0.0f, 0.0f, 0.0f };
 
 	// ローカル（カメラ視点）での移動ベクトルを設定

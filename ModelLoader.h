@@ -10,5 +10,5 @@ public:
     static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
     // mtlファイルを読み込んでMaterialDataを返す関数
-    static MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
+    static std::vector<MaterialData> LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename);
 };

@@ -1,126 +1,147 @@
 #include "ModelLoader.h"
+
+#include <cassert>
 #include <fstream>
 #include <sstream>
-#include <cassert>
 
-ModelData ModelLoader::LoadObjFile(const std::string& directoryPath, const std::string& filename)
-{
-    // 中で必要となる変数の宣言
-    ModelData modelData; // 構築するModelData
-    std::vector<Vector4> positions; // 位置
-    std::vector<Vector3> normals; // 法線
-    std::vector<Vector2> texcoords; // テクスチャ座標
-    std::string line; // ファイルから読んだ1行を格納するもの
+namespace {
+uint32_t FindMaterialIndex(const std::vector<MaterialData>& materials, const std::string& name) {
+    for (uint32_t index = 0; index < materials.size(); ++index) {
+        if (materials[index].name == name) {
+            return index;
+        }
+    }
+    return 0;
+}
+}
 
-    // ファイルを開く
-    std::ifstream file(directoryPath + "/" + filename); // ファイルを開く
-    assert(file.is_open()); // とりあえず開けなかったら止める
+ModelData ModelLoader::LoadObjFile(const std::string& directoryPath, const std::string& filename) {
+    ModelData modelData;
+    std::vector<Vector4> positions;
+    std::vector<Vector3> normals;
+    std::vector<Vector2> texcoords;
 
-    // 実際にファイルを読み、ModelDataを構築していく
-    while (std::getline(file, line))
-    {
+    std::ifstream file(directoryPath + "/" + filename);
+    assert(file.is_open());
+
+    std::string currentMeshName = "Default";
+    uint32_t currentMaterialIndex = 0;
+    MeshData* currentMesh = nullptr;
+
+    auto beginMesh = [&]() -> MeshData& {
+        if (currentMesh == nullptr) {
+            modelData.meshes.push_back({ currentMeshName, {}, currentMaterialIndex });
+            currentMesh = &modelData.meshes.back();
+        }
+        return *currentMesh;
+    };
+
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream stream(line);
         std::string identifier;
-        std::istringstream s(line);
-        s >> identifier; // 先頭の識別子を読む
+        stream >> identifier;
 
-        // identifierに応じた処理
-        if (identifier == "v") 
-        {
-            Vector4 position;
-            s >> position.x >> position.y >> position.z;
-            // 右手系から左手系への変換のため、X座標を反転する
+        if (identifier == "v") {
+            Vector4 position{};
+            stream >> position.x >> position.y >> position.z;
             position.x *= -1.0f;
             position.w = 1.0f;
             positions.push_back(position);
         }
-        else if (identifier == "vt") 
-        {
-            Vector2 texcoord;
-            s >> texcoord.x >> texcoord.y;
-            // DirectXに合わせてV方向を反転させる
+        else if (identifier == "vt") {
+            Vector2 texcoord{};
+            stream >> texcoord.x >> texcoord.y;
             texcoord.y = 1.0f - texcoord.y;
             texcoords.push_back(texcoord);
         }
-        else if (identifier == "vn")
-        {
-            Vector3 normal;
-            s >> normal.x >> normal.y >> normal.z;
-            // 法線のX方向も同様に反転する
+        else if (identifier == "vn") {
+            Vector3 normal{};
+            stream >> normal.x >> normal.y >> normal.z;
             normal.x *= -1.0f;
             normals.push_back(normal);
         }
-        else if (identifier == "f") 
-        {
-            std::vector<VertexData> faceVertices; // 一時的に面の頂点を保存する配列
+        else if (identifier == "mtllib") {
+            std::string materialFilename;
+            stream >> materialFilename;
+            modelData.materials = LoadMaterialTemplateFile(directoryPath, materialFilename);
+        }
+        else if (identifier == "o" || identifier == "g") {
+            stream >> currentMeshName;
+            if (currentMeshName.empty()) {
+                currentMeshName = "Unnamed Mesh";
+            }
+            currentMesh = nullptr;
+        }
+        else if (identifier == "usemtl") {
+            std::string materialName;
+            stream >> materialName;
+            currentMaterialIndex = FindMaterialIndex(modelData.materials, materialName);
+
+            // A material change needs a new draw call, so split it into a submesh.
+            if (currentMesh != nullptr && !currentMesh->vertices.empty()) {
+                currentMesh = nullptr;
+            }
+        }
+        else if (identifier == "f") {
+            std::vector<VertexData> faceVertices;
             std::string vertexDefinition;
 
-            // 行の残りにある頂点定義をすべて読み込む（四角形ポリゴンなどに対応）
-            while (s >> vertexDefinition) 
-            {
-                std::istringstream v(vertexDefinition);
-                uint32_t elementIndices[3] = { 0, 0, 0 };
-                for (int32_t element = 0; element < 3; ++element)
-                {
+            while (stream >> vertexDefinition) {
+                std::istringstream vertexStream(vertexDefinition);
+                uint32_t elementIndices[3] = {};
+                for (int32_t element = 0; element < 3; ++element) {
                     std::string index;
-                    std::getline(v, index, '/');
+                    std::getline(vertexStream, index, '/');
                     if (!index.empty()) {
-                        elementIndices[element] = std::stoi(index);
+                        elementIndices[element] = static_cast<uint32_t>(std::stoul(index));
                     }
                 }
 
-                Vector4 position = positions[elementIndices[0] - 1];
-                Vector2 texcoord = texcoords[elementIndices[1] - 1];
-                Vector3 normal = normals[elementIndices[2] - 1];
-
+                const Vector4 position = positions[elementIndices[0] - 1];
+                const Vector2 texcoord = elementIndices[1] == 0 ? Vector2{} : texcoords[elementIndices[1] - 1];
+                const Vector3 normal = elementIndices[2] == 0 ? Vector3{ 0.0f, 1.0f, 0.0f } : normals[elementIndices[2] - 1];
                 faceVertices.push_back({ position, texcoord, normal });
             }
 
-            // 読み込んだ頂点を三角形に分割して登録（右手系から左手系への変換のため逆順に）
-            for (size_t i = 1; i < faceVertices.size() - 1; ++i) {
-                modelData.vertices.push_back(faceVertices[i + 1]);
-                modelData.vertices.push_back(faceVertices[i]);
-                modelData.vertices.push_back(faceVertices[0]);
+            MeshData& mesh = beginMesh();
+            for (size_t index = 1; index + 1 < faceVertices.size(); ++index) {
+                mesh.vertices.push_back(faceVertices[index + 1]);
+                mesh.vertices.push_back(faceVertices[index]);
+                mesh.vertices.push_back(faceVertices[0]);
             }
         }
-        else if (identifier == "mtllib")
-        {
-            // materialTemplateLibraryファイルの名前を取得する
-            std::string materialFilename;
-            s >> materialFilename;
-            // 基本的にobjファイルと同一階層にmtlは存在させるので、ディレクトリ名とファイル名を渡す
-            modelData.material = LoadMaterialTemplateFile(directoryPath, materialFilename);
-        }
-
     }
 
-    // ModelDataを返す
+    if (modelData.materials.empty()) {
+        modelData.materials.push_back({ "Default", directoryPath + "/uvChecker.png" });
+    }
     return modelData;
 }
 
-MaterialData ModelLoader::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename)
-{
-    // 必要な変数の宣言を行い、ファイルを開く
-    MaterialData materialData; // 構築するMaterialData
-    std::string line; // ファイルから読んだ1行を格納するもの
-    std::ifstream file(directoryPath + "/" + filename); // ファイルを開く
-    assert(file.is_open()); // とりあえず開けなかったら止める
+std::vector<MaterialData> ModelLoader::LoadMaterialTemplateFile(const std::string& directoryPath, const std::string& filename) {
+    std::vector<MaterialData> materials;
+    std::ifstream file(directoryPath + "/" + filename);
+    assert(file.is_open());
 
-    // 実際にファイルを読み、MaterialDataを構築していく
-    while (std::getline(file, line))
-    {
+    MaterialData* currentMaterial = nullptr;
+    std::string line;
+    while (std::getline(file, line)) {
+        std::istringstream stream(line);
         std::string identifier;
-        std::istringstream s(line);
-        s >> identifier;
+        stream >> identifier;
 
-        // identifierに応じた処理
-        if (identifier == "map_Kd")
-        {
+        if (identifier == "newmtl") {
+            std::string name;
+            stream >> name;
+            materials.push_back({ name, directoryPath + "/uvChecker.png" });
+            currentMaterial = &materials.back();
+        }
+        else if (identifier == "map_Kd" && currentMaterial != nullptr) {
             std::string textureFilename;
-            s >> textureFilename;
-            // 連結してファイルパスにする
-            materialData.textureFilePath = directoryPath + "/" + textureFilename;
+            stream >> textureFilename;
+            currentMaterial->textureFilePath = directoryPath + "/" + textureFilename;
         }
     }
-
-    return materialData;
+    return materials;
 }

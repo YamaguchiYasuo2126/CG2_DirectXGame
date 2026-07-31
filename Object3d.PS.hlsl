@@ -3,7 +3,7 @@
 struct Material
 {
     float4 color;
-    int32_t enableLighting;
+    int32_t lightingMode;
     // C++側の float padding[3]; に対応させるための隙間
     float3 padding;
     float4x4 uvTransform;
@@ -36,7 +36,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
-    if (gMaterial.enableLighting != 0)
+    if (gMaterial.lightingMode == 2)
     {
         // Half Lambert
         float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
@@ -44,6 +44,12 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         // 最終的な色 = マテリアル色 × テクスチャ色 × ライト色 × cosθ × 輝度
         output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+    }
+    else if (gMaterial.lightingMode == 1)
+    {
+        // Lambert
+        float NdotL = saturate(dot(normalize(input.normal), -gDirectionalLight.direction));
+        output.color = gMaterial.color * textureColor * gDirectionalLight.color * NdotL * gDirectionalLight.intensity;
     }
     else
     {

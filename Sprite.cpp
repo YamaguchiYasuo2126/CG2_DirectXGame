@@ -76,7 +76,7 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
     materialDataSprite_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
     // SpriteはLightingしないのでfalseを設定する
-    materialDataSprite_->enableLighting = false;
+    materialDataSprite_->lightingMode = static_cast<int32_t>(LightingMode::None);
 
     // UVTransform行列を単位行列で初期化
     materialDataSprite_->uvTransform = MatrixUtility::MakeIdentity4x4();
@@ -135,7 +135,7 @@ void Sprite::Draw() {
 
     // インデックスを使う
     // (描画するインデックス数, インスタンス数, インデックスの開始位置, 頂点の開始位置, インスタンスの開始位置)
-    //commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
+    commandList->DrawIndexedInstanced(6, 1, 0, 0, 0);
 }
 
 void Sprite::Finalize()
@@ -151,13 +151,16 @@ void Sprite::DrawImGui()
 #ifdef USE_IMGUI
     ImGui::Begin("Settings");
 
+    if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen)) {
+
     // transformSprite_ の translate (平行移動) の X, Y, Z をいじれるようにする
-    ImGui::DragFloat3("translateSprite", &transformSprite_.translate.x, 1.0f);
+        ImGui::DragFloat3("Sprite Translate", &transformSprite_.translate.x, 1.0f);
 
     // UVTransformのパラメータ編集用
-    ImGui::DragFloat2("UVTranslate", &uvTransformSprite_.translate.x, 0.01f, -10.0f, 10.0f);
-    ImGui::DragFloat2("UVScale", &uvTransformSprite_.scale.x, 0.01f, -10.0f, 10.0f);
-    ImGui::SliderAngle("UVRotate", &uvTransformSprite_.rotate.z);
+        ImGui::DragFloat2("UV Translate", &uvTransformSprite_.translate.x, 0.01f, -10.0f, 10.0f);
+        ImGui::DragFloat2("UV Scale", &uvTransformSprite_.scale.x, 0.01f, -10.0f, 10.0f);
+        ImGui::SliderAngle("UV Rotate", &uvTransformSprite_.rotate.z);
+    }
 
     ImGui::End();
 #endif

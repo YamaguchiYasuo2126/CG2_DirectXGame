@@ -12,9 +12,12 @@
 // アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
 class GameApplication {
 public:
+	using BgmControlCallback = void(*)(void*);
+
 	void Initialize();
 	void Run();
 	void Finalize();
+	void SetBgmControls(BgmControlCallback play, BgmControlCallback stop, void* context);
 
 private:
 	void InitializeImGui();
@@ -28,11 +31,20 @@ private:
 	DirectXCommon dxCommon_;
 	Input input_;
 	bool isDebugCameraActive_ = false;
+	BgmControlCallback playBgm_ = nullptr;
+	BgmControlCallback stopBgm_ = nullptr;
+	void* bgmContext_ = nullptr;
+	bool isBgmPlaying_ = false;
 	// 通常カメラ用のTransform
 	Transform normalCameraTransform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 	DebugCamera debugCamera_;
 	ShaderCompiler shaderCompiler_;
 	Object3d object3d_;
+	Object3d sphere3d_;
+	Object3d teapot3d_;
+	Object3d bunny3d_;
+	Object3d multiMesh3d_;
+	Object3d multiMaterial3d_;
 	Sprite sprite_;
 	bool initialized_ = false;
 };

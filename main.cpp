@@ -142,12 +142,22 @@ void SoundUnload(SoundData* soundData)
 }
 
 // 音声再生
-void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData)
+void SoundStopWave(IXAudio2SourceVoice*& sourceVoice)
+{
+	if (sourceVoice != nullptr) {
+		sourceVoice->Stop();
+		sourceVoice->FlushSourceBuffers();
+		sourceVoice->DestroyVoice();
+		sourceVoice = nullptr;
+	}
+}
+
+void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData, IXAudio2SourceVoice*& sourceVoice)
 {
 	HRESULT hr;
 
-	IXAudio2SourceVoice* pSourceVoice = nullptr;
-	hr = xAudio2->CreateSourceVoice(&pSourceVoice, &soundData.wfex);
+	SoundStopWave(sourceVoice);
+	hr = xAudio2->CreateSourceVoice(&sourceVoice, &soundData.wfex);
 	assert(SUCCEEDED(hr));
 
 	XAUDIO2_BUFFER buf{};
@@ -156,8 +166,29 @@ void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData)
 	buf.Flags = XAUDIO2_END_OF_STREAM;
 
 	// 波形データの再生
-	hr = pSourceVoice->SubmitSourceBuffer(&buf);
-	hr = pSourceVoice->Start();
+	hr = sourceVoice->SubmitSourceBuffer(&buf);
+	assert(SUCCEEDED(hr));
+	hr = sourceVoice->Start();
+	assert(SUCCEEDED(hr));
+}
+
+struct BgmContext
+{
+	IXAudio2* xAudio2 = nullptr;
+	const SoundData* soundData = nullptr;
+	IXAudio2SourceVoice* sourceVoice = nullptr;
+};
+
+void PlayBgm(void* context)
+{
+	BgmContext* bgm = static_cast<BgmContext*>(context);
+	SoundPlayWave(bgm->xAudio2, *bgm->soundData, bgm->sourceVoice);
+}
+
+void StopBgm(void* context)
+{
+	BgmContext* bgm = static_cast<BgmContext*>(context);
+	SoundStopWave(bgm->sourceVoice);
 }
 
 int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
@@ -177,11 +208,16 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	hr = xAudio2->CreateMasteringVoice(&masterVoice);
 
-	SoundPlayWave(xAudio2.Get(), soundData1);
+	BgmContext bgmContext = { xAudio2.Get(), &soundData1, nullptr };
+	application.SetBgmControls(PlayBgm, StopBgm, &bgmContext);
 
 	application.Run();
 
 	// XAudio2解放
+	StopBgm(&bgmContext);
+	if (masterVoice != nullptr) {
+		masterVoice->DestroyVoice();
+	}
 	xAudio2.Reset();
 
 	// 音声データ開放

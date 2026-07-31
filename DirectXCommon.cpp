@@ -130,6 +130,11 @@ D3D12_GPU_DESCRIPTOR_HANDLE DirectXCommon::GetSrvGpuHandle(uint32_t index) const
 	return GetGPUDescriptorHandle(srvDescriptorHeap_.Get(), descriptorSizeSRV_, index);
 }
 
+uint32_t DirectXCommon::AllocateSrvIndex() {
+	assert(nextSrvIndex_ < 128);
+	return nextSrvIndex_++;
+}
+
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index) const {
 	D3D12_CPU_DESCRIPTOR_HANDLE handleCPU = descriptorHeap->GetCPUDescriptorHandleForHeapStart();
 	handleCPU.ptr += (descriptorSize * index);
