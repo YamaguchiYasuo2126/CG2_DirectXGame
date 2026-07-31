@@ -67,6 +67,8 @@ void Object3d::Update() {
 	materialData_->uvTransform = uvTransformMatrix;
 }
 
+
+
 void Object3d::Draw() {
 	// Pipelineと各種バッファを設定し、頂点6個分の三角形を描画します。
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();

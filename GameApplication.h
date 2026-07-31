@@ -6,6 +6,7 @@
 #include "ShaderCompiler.h"
 #include "WinApp.h"
 #include "Sprite.h"
+#include "Input.h"
 
 // アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
 class GameApplication {
@@ -24,6 +25,8 @@ private:
 	Logger logger_;
 	WinApp winApp_;
 	DirectXCommon dxCommon_;
+	Input input_;
+	bool isDebugCameraActive_ = false;
 	ShaderCompiler shaderCompiler_;
 	Object3d object3d_;
 	Sprite sprite_;

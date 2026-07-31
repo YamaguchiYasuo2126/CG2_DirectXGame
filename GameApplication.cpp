@@ -15,6 +15,11 @@ void GameApplication::Initialize() {
 	// 依存される側から順番に初期化します。
 	logger_.Initialize();
 	winApp_.Initialize();
+
+	HINSTANCE hInstance = GetModuleHandle(nullptr); // HINSTANCEを取得
+	HWND hwnd = winApp_.GetHwnd();                  // HWNDを取得
+	input_.Initialize(hInstance, hwnd);             // Inputクラスの初期化
+
 	dxCommon_.Initialize(winApp_.GetHwnd(), WinApp::kClientWidth, WinApp::kClientHeight, &logger_);
 	shaderCompiler_.Initialize(&logger_);
 	object3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_);
@@ -28,6 +33,8 @@ void GameApplication::Run() {
 		// 1フレーム分のUIとDirectX描画コマンドを積みます。
 		BeginImGuiFrame();
 		dxCommon_.BeginFrame();
+
+		input_.Update();
 
 		// ゲーム側の更新と描画です。描画対象が増えたらこの周辺に追加します。
 		object3d_.Update();
