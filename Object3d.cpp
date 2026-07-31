@@ -51,14 +51,9 @@ void Object3d::Update() {
 	// WVP行列を定数バッファへ書き込みます。
 
 	Matrix4x4 worldMatrix = MatrixUtility::MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
-	Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(cameraTransform_.scale, cameraTransform_.rotate, cameraTransform_.translate);
-	Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
-	Matrix4x4 projectionMatrix = MatrixUtility::MakePerspectiveFovMatrix(
-		0.45f,
-		float(dxCommon_->GetWidth()) / float(dxCommon_->GetHeight()),
-		0.1f,
-		100.0f);
-	Matrix4x4 worldViewProjectionMatrix = MatrixUtility::Multiply(worldMatrix, MatrixUtility::Multiply(viewMatrix, projectionMatrix));
+	
+	// 代わりに、外部から受け取ったviewProjection_を掛ける
+	Matrix4x4 worldViewProjectionMatrix = MatrixUtility::Multiply(worldMatrix, viewProjection_);
 	wvpData_->WVP = worldViewProjectionMatrix;
 	wvpData_->World = worldMatrix;
 

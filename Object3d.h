@@ -8,6 +8,7 @@
 #include <array>
 #include <string>
 
+#include "MatrixUtility.h"
 #include "Matrix4x4.h"
 #include "Transform.h"
 #include "Vector4.h"
@@ -31,6 +32,8 @@ public:
 	void Update();
 	void Draw();
 	void DrawImGui();
+
+	void SetViewProjectionMatrix(const Matrix4x4& viewProjection) { viewProjection_ = viewProjection; }
 
 private:
 	// 描画に必要なDirectXリソースを用途ごとに作成します。
@@ -85,4 +88,6 @@ private:
 
 	// 読み込んだモデルデータを保持する変数
 	ModelData modelData_;
+
+	Matrix4x4 viewProjection_ = MatrixUtility::MakeIdentity4x4();
 };

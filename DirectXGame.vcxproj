@@ -12,6 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ConvertString.cpp" />
+    <ClCompile Include="DebugCamera.cpp" />
     <ClCompile Include="DirectXCommon.cpp" />
     <ClCompile Include="DirectXResource.cpp" />
     <ClCompile Include="externals\imgui\imgui.cpp">
@@ -50,6 +51,7 @@
   <ItemGroup>
     <ClInclude Include="ConvertString.h" />
     <ClInclude Include="D3DResourceLeakChecker.h" />
+    <ClInclude Include="DebugCamera.h" />
     <ClInclude Include="DirectionalLight.h" />
     <ClInclude Include="DirectXCommon.h" />
     <ClInclude Include="DirectXResource.h" />

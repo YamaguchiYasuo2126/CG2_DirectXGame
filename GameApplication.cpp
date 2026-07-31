@@ -24,6 +24,7 @@ void GameApplication::Initialize() {
 	shaderCompiler_.Initialize(&logger_);
 	object3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_);
 	sprite_.Initialize(&dxCommon_);
+	debugCamera_.Initialize();
 	InitializeImGui();
 	initialized_ = true;
 }
@@ -35,6 +36,42 @@ void GameApplication::Run() {
 		dxCommon_.BeginFrame();
 
 		input_.Update();
+
+		// ImGuiのウィンドウでカメラを切り替えられるようにする
+#ifdef USE_IMGUI
+		ImGui::Begin("Camera Settings");
+		ImGui::Checkbox("Debug Camera Active", &isDebugCameraActive_);
+		ImGui::End();
+#endif
+
+		Matrix4x4 viewProjection;
+
+		if (isDebugCameraActive_) {
+			// デバッグカメラがONのとき
+			debugCamera_.Update(&input_);
+			viewProjection = debugCamera_.GetViewProjectionMatrix();
+		}
+		else {
+			// デバッグカメラがOFFのとき（通常のカメラ）
+			// 通常カメラの行列を計算する
+			Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(
+				normalCameraTransform_.scale,
+				normalCameraTransform_.rotate,
+				normalCameraTransform_.translate
+			);
+			Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
+			Matrix4x4 projectionMatrix = MatrixUtility::MakePerspectiveFovMatrix(
+				0.45f,
+				float(WinApp::kClientWidth) / float(WinApp::kClientHeight),
+				0.1f,
+				100.0f
+			);
+			viewProjection = MatrixUtility::Multiply(viewMatrix, projectionMatrix);
+		}
+
+		// 決定した行列をオブジェクトに渡す
+		object3d_.SetViewProjectionMatrix(viewProjection);
+		object3d_.SetViewProjectionMatrix(debugCamera_.GetViewProjectionMatrix());
 
 		// ゲーム側の更新と描画です。描画対象が増えたらこの周辺に追加します。
 		object3d_.Update();

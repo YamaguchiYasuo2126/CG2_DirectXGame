@@ -7,6 +7,7 @@
 #include "WinApp.h"
 #include "Sprite.h"
 #include "Input.h"
+#include "DebugCamera.h"
 
 // アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
 class GameApplication {
@@ -27,6 +28,9 @@ private:
 	DirectXCommon dxCommon_;
 	Input input_;
 	bool isDebugCameraActive_ = false;
+	// 通常カメラ用のTransform
+	Transform normalCameraTransform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
+	DebugCamera debugCamera_;
 	ShaderCompiler shaderCompiler_;
 	Object3d object3d_;
 	Sprite sprite_;
