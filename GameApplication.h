@@ -45,6 +45,7 @@ private:
 	Object3d bunny3d_;
 	Object3d multiMesh3d_;
 	Object3d multiMaterial3d_;
+	Object3d fence3d_;
 	Sprite sprite_;
 	bool initialized_ = false;
 };

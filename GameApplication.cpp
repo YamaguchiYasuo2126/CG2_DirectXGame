@@ -155,12 +155,12 @@ void GameApplication::Run() {
 
 		// 描画
 		object3d_.Draw();
-		sphere3d_.Draw();
+		/*sphere3d_.Draw();
 		teapot3d_.Draw();
 		bunny3d_.Draw();
 		multiMesh3d_.Draw();
 		multiMaterial3d_.Draw();
-		sprite_.Draw();
+		sprite_.Draw();*/
 
 		EndImGuiFrame();
 		dxCommon_.EndFrame();

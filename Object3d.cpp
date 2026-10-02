@@ -13,17 +13,16 @@
 #include "externals/imgui/imgui.h"
 #endif
 
-void Object3d::Initialize(
-	DirectXCommon* dxCommon,
-	ShaderCompiler* shaderCompiler,
-	Logger* logger,
-	const std::string& modelName,
-	const std::string& objectName) {
+void Object3d::Initialize(DirectXCommon* dxCommon, ShaderCompiler* shaderCompiler,
+	Logger* logger, const std::string& modelName, const std::string& objectName, 
+	const std::string& modelDirectory) {
 	dxCommon_ = dxCommon;
 	shaderCompiler_ = shaderCompiler;
 	logger_ = logger;
 	modelName_ = modelName;
 	objectName_ = objectName;
+	modelDirectory_ = modelDirectory;
+
 
 	if (modelName_ == "sphere") {
 		transform_.rotate = { 0.0f, 0.0f, 0.0f };
@@ -209,8 +208,17 @@ void Object3d::CreatePipelineState() {
 	inputElements[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 	D3D12_INPUT_LAYOUT_DESC inputLayout{ inputElements, _countof(inputElements) };
 
+	// ノーマルブレンド用の設定
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+	blendDesc.RenderTarget[0].BlendEnable = TRUE;
+	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
@@ -289,7 +297,7 @@ void Object3d::CreateVertexBuffer() {
 		CreateSphereVertices();
 	}
 	else {
-		modelData_ = ModelLoader::LoadObjFile("resources", modelName_);
+		modelData_ = ModelLoader::LoadObjFile(modelDirectory_, modelName_);
 	}
 
 	meshResources_.resize(modelData_.meshes.size());

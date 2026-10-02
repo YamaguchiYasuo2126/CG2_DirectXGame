@@ -7,6 +7,7 @@
 #include <wrl.h>
 #include <string>
 #include <vector>
+#include <array>
 
 #include "MatrixUtility.h"
 #include "Matrix4x4.h"
@@ -24,7 +25,8 @@ class Logger;
 class ShaderCompiler;
 
 
-// テクスチャ付き3Dオブジェクトの初期化、更新、描画を担当します。
+
+// テクスチャ付き3Dオブジェクトの初期化、更新、描画を担当。
 class Object3d {
 public:
 	void Initialize(
@@ -32,7 +34,9 @@ public:
 		ShaderCompiler* shaderCompiler,
 		Logger* logger,
 		const std::string& modelName = "plane.obj",
-		const std::string& objectName = "Plane");
+		const std::string& objectName = "Plane",
+		const std::string& modelDirectory = "resources");
+
 	void Finalize();
 	void Update();
 	void Draw();
@@ -41,7 +45,7 @@ public:
 	void SetViewProjectionMatrix(const Matrix4x4& viewProjection) { viewProjection_ = viewProjection; }
 
 private:
-	// 描画に必要なDirectXリソースを用途ごとに作成します。
+	// 描画に必要なDirectXリソースを用途ごとに作成。
 	void CreateRootSignature();
 	void CreatePipelineState();
 	void CreateConstantBuffers();
@@ -66,7 +70,7 @@ private:
 	ShaderCompiler* shaderCompiler_ = nullptr;
 	Logger* logger_ = nullptr;
 
-	// Pipeline関連のリソースです。
+	// Pipeline関連のリソース。
 	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob_;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob_;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
@@ -74,7 +78,7 @@ private:
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob_;
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob_;
 
-	// 描画するオブジェクトが使うバッファとテクスチャです。
+	// 描画するオブジェクトが使うバッファとテクスチャ。
 	Microsoft::WRL::ComPtr<ID3D12Resource> wvpResource_;
 	std::vector<MeshGpuResource> meshResources_;
 	std::vector<MaterialGpuResource> materialResources_;
@@ -86,6 +90,9 @@ private:
 	DirectionalLight* directionalLightData_ = nullptr;
 
 	TransformationMatrix* wvpData_ = nullptr;
+
+	// モデルディレクトリ
+	std::string modelDirectory_ = "resources";
 
 	// テクスチャリソースとSRVハンドルを2つ持つように配列化
 	std::string modelName_ = "plane.obj";

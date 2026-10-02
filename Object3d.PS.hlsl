@@ -42,14 +42,19 @@ PixelShaderOutput main(VertexShaderOutput input)
         float NdotL = dot(normalize(input.normal), -gDirectionalLight.direction);
         float cos = pow(NdotL * 0.5f + 0.5f, 2.0f);
         
+        // 色にはLightingを行い、α値には行わないようにする
         // 最終的な色 = マテリアル色 × テクスチャ色 × ライト色 × cosθ × 輝度
-        output.color = gMaterial.color * textureColor * gDirectionalLight.color * cos * gDirectionalLight.intensity;
+        output.color.rgb = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * cos * gDirectionalLight.intensity;
+        // 最終的なアルファ値 = マテリアル色のアルファ値 * テクスチャ色のアルファ値
+        output.color.a = gMaterial.color.a * textureColor.a;
     }
     else if (gMaterial.lightingMode == 1)
     {
         // Lambert
         float NdotL = saturate(dot(normalize(input.normal), -gDirectionalLight.direction));
-        output.color = gMaterial.color * textureColor * gDirectionalLight.color * NdotL * gDirectionalLight.intensity;
+        output.color.rgb = gMaterial.color.rgb * textureColor.rgb * gDirectionalLight.color.rgb * NdotL * gDirectionalLight.intensity;
+        // 照明の強さで透明度を変えない
+        output.color.a = gMaterial.color.a * textureColor.a;
     }
     else
     {
