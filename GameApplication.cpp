@@ -56,6 +56,7 @@ void GameApplication::Initialize() {
 	sphere3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "sphere", "Sphere");
 	teapot3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "teapot.obj", "Utah Teapot");
 	bunny3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "bunny.obj", "Stanford Bunny");
+	fence3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_,"fence.obj", "Fence", "resources/fence");
 	multiMesh3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMesh.obj", "Multi Mesh");
 	multiMaterial3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMaterial.obj", "Multi Material");
 	sprite_.Initialize(&dxCommon_);
@@ -132,6 +133,7 @@ void GameApplication::Run() {
 		sphere3d_.SetViewProjectionMatrix(viewProjection);
 		teapot3d_.SetViewProjectionMatrix(viewProjection);
 		bunny3d_.SetViewProjectionMatrix(viewProjection);
+		fence3d_.SetViewProjectionMatrix(viewProjection);
 		multiMesh3d_.SetViewProjectionMatrix(viewProjection);
 		multiMaterial3d_.SetViewProjectionMatrix(viewProjection);
 
@@ -140,6 +142,7 @@ void GameApplication::Run() {
 		sphere3d_.Update();
 		teapot3d_.Update();
 		bunny3d_.Update();
+		fence3d_.Update();
 		multiMesh3d_.Update();
 		multiMaterial3d_.Update();
 		sprite_.Update();
@@ -150,6 +153,7 @@ void GameApplication::Run() {
 		sphere3d_.DrawImGui();
 		teapot3d_.DrawImGui();
 		bunny3d_.DrawImGui();
+		fence3d_.DrawImGui();
 		multiMesh3d_.DrawImGui();
 		multiMaterial3d_.DrawImGui();
 
@@ -161,6 +165,7 @@ void GameApplication::Run() {
 		multiMesh3d_.Draw();
 		multiMaterial3d_.Draw();
 		sprite_.Draw();*/
+		fence3d_.Draw();
 
 		EndImGuiFrame();
 		dxCommon_.EndFrame();
@@ -177,6 +182,7 @@ void GameApplication::Finalize() {
 	sprite_.Finalize();
 	multiMaterial3d_.Finalize();
 	multiMesh3d_.Finalize();
+	fence3d_.Finalize();
 	bunny3d_.Finalize();
 	teapot3d_.Finalize();
 	sphere3d_.Finalize();

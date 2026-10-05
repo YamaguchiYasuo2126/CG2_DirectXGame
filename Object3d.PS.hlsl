@@ -36,6 +36,12 @@ PixelShaderOutput main(VertexShaderOutput input)
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
+    // テクスチャのαが0.5以下なら、このピクセルの描画を破棄
+    if (textureColor.a <= 0.5f)
+    {
+        discard;
+    }
+    
     if (gMaterial.lightingMode == 2)
     {
         // Half Lambert
