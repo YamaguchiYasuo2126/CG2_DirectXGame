@@ -15,7 +15,8 @@
 
 void Particle::Initialize(DirectXCommon* dxCommon, ShaderCompiler* shaderCompiler,
 	Logger* logger, const std::string& modelName, const std::string& objectName,
-	const std::string& modelDirectory) {
+	const std::string& modelDirectory)
+{
 	dxCommon_ = dxCommon;
 	shaderCompiler_ = shaderCompiler;
 	logger_ = logger;
@@ -23,40 +24,19 @@ void Particle::Initialize(DirectXCommon* dxCommon, ShaderCompiler* shaderCompile
 	objectName_ = objectName;
 	modelDirectory_ = modelDirectory;
 
-
-	if (modelName_ == "sphere") {
-		transform_.rotate = { 0.0f, 0.0f, 0.0f };
-		transform_.translate = { 3.0f, 0.0f, 0.0f };
-	}
-	else if (modelName_ == "teapot.obj") {
-		transform_.rotate = { 0.0f, 0.0f, 0.0f };
-		transform_.translate = { 0.0f, -1.5f, 0.0f };
-	}
-	else if (modelName_ == "bunny.obj") {
-		transform_.rotate = { 0.0f, 0.0f, 0.0f };
-		transform_.translate = { -3.0f, -1.2f, 0.0f };
-	}
-	else if (modelName_ == "multiMesh.obj") {
-		transform_.rotate = { 0.0f, 0.0f, 0.0f };
-		transform_.translate = { 0.0f, 2.5f, 0.0f };
-	}
-	else if (modelName_ == "multiMaterial.obj") {
-		transform_.rotate = { 0.0f, 0.0f, 0.0f };
-		transform_.translate = { 4.5f, -1.5f, 0.0f };
-	}
-
 	CreateRootSignature();
 	CreatePipelineState();
-	CreateVertexBuffer();
-	CreateConstantBuffers();
+	CreateVertexBuffer();	 // メッシュとマテリアル情報も生成
+	CreateConstantBuffers(); // MaterialのConstantBufferを作成
 	CreateTexture();
+	CreateInstancingResource();
 }
 
-void Particle::Finalize() {
+void Particle::Finalize()
+{
 	meshResources_.clear();
 	materialResources_.clear();
-	directionalLightResource_.Reset();
-	wvpResource_.Reset();
+	instancingResource_.Reset();
 	graphicsPipelineState_.Reset();
 	pixelShaderBlob_.Reset();
 	vertexShaderBlob_.Reset();
@@ -66,14 +46,27 @@ void Particle::Finalize() {
 	logger_ = nullptr;
 	shaderCompiler_ = nullptr;
 	dxCommon_ = nullptr;
+	instancingData_ = nullptr;
 }
 
-void Particle::Update() {
-	const Matrix4x4 worldMatrix = MatrixUtility::MakeAffineMatrix(transform_.scale, transform_.rotate, transform_.translate);
-	wvpData_->WVP = MatrixUtility::Multiply(worldMatrix, viewProjection_);
-	wvpData_->World = worldMatrix;
+void Particle::Update()
+{
+	assert(instanceCount_ <= kMaxInstanceCount);
 
-	for (MaterialGpuResource& material : materialResources_) {
+	for (uint32_t i = 0; i < instanceCount_; ++i)
+	{
+		const Matrix4x4 world = MatrixUtility::MakeAffineMatrix(
+			transforms_[i].scale,
+			transforms_[i].rotate,
+			transforms_[i].translate);
+
+		instancingData_[i].World = world;
+		instancingData_[i].WVP = MatrixUtility::Multiply(world, viewProjection_);
+	}
+
+	// Object3dから流用したMaterialのUV更新
+	for (MaterialGpuResource& material : materialResources_)
+	{
 		material.materialData->uvTransform = MatrixUtility::MakeAffineMatrix(
 			material.uvTransform.scale,
 			material.uvTransform.rotate,
@@ -81,47 +74,64 @@ void Particle::Update() {
 	}
 }
 
-void Particle::Draw() {
+void Particle::Draw()
+{
+	assert(instanceCount_ <= kMaxInstanceCount);
+
+	if (instanceCount_ == 0)
+	{
+		return;
+	}
+
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
-	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
 
-	for (uint32_t meshIndex = 0; meshIndex < modelData_.meshes.size(); ++meshIndex) {
-		const MeshData& mesh = modelData_.meshes[meshIndex];
-		assert(mesh.materialIndex < materialResources_.size());
-		const MeshGpuResource& meshResource = meshResources_[meshIndex];
-		const MaterialGpuResource& materialResource = materialResources_[mesh.materialIndex];
+	const auto& mesh = meshResources_[0];
+	const auto& material = materialResources_[0];
 
-		commandList->IASetVertexBuffers(0, 1, &meshResource.vertexBufferView);
-		commandList->SetGraphicsRootConstantBufferView(0, materialResource.materialResource->GetGPUVirtualAddress());
-		commandList->SetGraphicsRootDescriptorTable(2, materialResource.textureSrvHandleGPU);
-		commandList->DrawInstanced(static_cast<UINT>(mesh.vertices.size()), 1, 0, 0);
-	}
+	commandList->IASetVertexBuffers(0, 1, &mesh.vertexBufferView);
+
+	// [0] Material
+	commandList->SetGraphicsRootConstantBufferView(0, material.materialResource->GetGPUVirtualAddress());
+
+	// [1] 行列配列のSRV
+	commandList->SetGraphicsRootDescriptorTable(1, instancingSrvHandleGPU_);
+
+	// [2] テクスチャのSRV
+	commandList->SetGraphicsRootDescriptorTable(2, material.textureSrvHandleGPU);
+
+	commandList->DrawInstanced(static_cast<UINT>(modelData_.meshes[0].vertices.size()), instanceCount_, 0, 0);
 }
 
-void Particle::DrawImGui() {
+void Particle::DrawImGui()
+{
 #ifdef USE_IMGUI
 	ImGui::Begin("Settings");
 	ImGui::PushID(objectName_.c_str());
-	if (ImGui::CollapsingHeader(objectName_.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
+	if (ImGui::CollapsingHeader(objectName_.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+	{
 		ImGui::DragFloat3("Translate", &transform_.translate.x, 0.01f);
 		ImGui::DragFloat3("Rotate (rad)", &transform_.rotate.x, 0.01f);
 		ImGui::DragFloat3("Scale", &transform_.scale.x, 0.01f, 0.01f, 100.0f);
 
-		if (ImGui::TreeNode("Materials")) {
+		if (ImGui::TreeNode("Materials"))
+		{
 			static constexpr const char* kLightingModeNames[] = { "Lighting None", "Lambert", "Half Lambert" };
 			for (uint32_t materialIndex = 0; materialIndex < materialResources_.size(); ++materialIndex) {
 				MaterialGpuResource& material = materialResources_[materialIndex];
 				const std::string& materialName = modelData_.materials[materialIndex].name;
 				ImGui::PushID(static_cast<int>(materialIndex));
-				if (ImGui::TreeNode(materialName.empty() ? "Material" : materialName.c_str())) {
+				if (ImGui::TreeNode(materialName.empty() ? "Material" : materialName.c_str())) 
+				{
 					int lightingMode = material.materialData->lightingMode;
-					if (ImGui::Combo("Lighting", &lightingMode, kLightingModeNames, IM_ARRAYSIZE(kLightingModeNames))) {
+					if (ImGui::Combo("Lighting", &lightingMode, kLightingModeNames, IM_ARRAYSIZE(kLightingModeNames)))
+					{
 						material.materialData->lightingMode = lightingMode;
 					}
+
 					ImGui::ColorEdit4("Color", &material.materialData->color.x);
 					ImGui::DragFloat2("UV Translate", &material.uvTransform.translate.x, 0.01f);
 					ImGui::DragFloat2("UV Scale", &material.uvTransform.scale.x, 0.01f, 0.01f, 100.0f);
@@ -134,46 +144,45 @@ void Particle::DrawImGui() {
 		}
 	}
 
-	if (ImGui::CollapsingHeader("Light")) {
-		ImGui::ColorEdit4("Color", &directionalLightData_->color.x);
-		ImGui::DragFloat3("Direction", &directionalLightData_->direction.x, 0.01f, -1.0f, 1.0f);
-		const float length = std::sqrt(
-			directionalLightData_->direction.x * directionalLightData_->direction.x +
-			directionalLightData_->direction.y * directionalLightData_->direction.y +
-			directionalLightData_->direction.z * directionalLightData_->direction.z);
-		if (length > 0.0f) {
-			directionalLightData_->direction.x /= length;
-			directionalLightData_->direction.y /= length;
-			directionalLightData_->direction.z /= length;
-		}
-		ImGui::DragFloat("Intensity", &directionalLightData_->intensity, 0.01f);
-	}
 	ImGui::PopID();
 	ImGui::End();
 #endif
 }
 
-void Particle::CreateRootSignature() {
-	D3D12_DESCRIPTOR_RANGE descriptorRange{};
-	descriptorRange.BaseShaderRegister = 0;
-	descriptorRange.NumDescriptors = 1;
-	descriptorRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+void Particle::CreateRootSignature()
+{
+	// PSが読むテクスチャ用SRV
+	D3D12_DESCRIPTOR_RANGE textureRange{};
+	textureRange.BaseShaderRegister = 0; // PSのt0
+	textureRange.NumDescriptors = 1;
+	textureRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	textureRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	D3D12_ROOT_PARAMETER rootParameters[4] = {};
+	// VSが読むインスタンス行列用SRV
+	D3D12_DESCRIPTOR_RANGE instancingRange{};
+	instancingRange.RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
+	instancingRange.NumDescriptors = 1;
+	instancingRange.BaseShaderRegister = 0; // VSのt0
+	instancingRange.OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
+
+	D3D12_ROOT_PARAMETER rootParameters[3]{};
+
+	// [0] Material
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[0].Descriptor.ShaderRegister = 0;
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+
+	// [1] インスタンス行列
+	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[1].Descriptor.ShaderRegister = 0;
+	rootParameters[1].DescriptorTable.pDescriptorRanges = &instancingRange;
+	rootParameters[1].DescriptorTable.NumDescriptorRanges = 1;
+
+	// [2] テクスチャ
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[2].DescriptorTable.pDescriptorRanges = &descriptorRange;
+	rootParameters[2].DescriptorTable.pDescriptorRanges = &textureRange;
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
-	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[3].Descriptor.ShaderRegister = 1;
 
 	D3D12_STATIC_SAMPLER_DESC staticSampler{};
 	staticSampler.Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
@@ -193,40 +202,45 @@ void Particle::CreateRootSignature() {
 	rootSignatureDesc.NumStaticSamplers = 1;
 
 	HRESULT hr = D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob_, &errorBlob_);
-	if (FAILED(hr)) {
+	if (FAILED(hr))
+	{
 		logger_->Log(reinterpret_cast<char*>(errorBlob_->GetBufferPointer()));
 		assert(false);
 	}
+
 	hr = dxCommon_->GetDevice()->CreateRootSignature(0, signatureBlob_->GetBufferPointer(), signatureBlob_->GetBufferSize(), IID_PPV_ARGS(&rootSignature_));
 	assert(SUCCEEDED(hr));
 }
 
-void Particle::CreatePipelineState() {
+void Particle::CreatePipelineState()
+{
 	D3D12_INPUT_ELEMENT_DESC inputElements[3] = {};
 	inputElements[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 	inputElements[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 	inputElements[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 	D3D12_INPUT_LAYOUT_DESC inputLayout{ inputElements, _countof(inputElements) };
 
-	// ノーマルブレンド用の設定
+	// ノーマルブレンド(アルファブレンド)用の設定
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	blendDesc.RenderTarget[0].BlendEnable = TRUE;
 	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
 
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
-	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	// 四角形を両面から表示する
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
-	vertexShaderBlob_ = shaderCompiler_->Compile(L"Object3D.VS.hlsl", L"vs_6_0");
-	pixelShaderBlob_ = shaderCompiler_->Compile(L"Object3D.PS.hlsl", L"ps_6_0");
+	vertexShaderBlob_ = shaderCompiler_->Compile(L"Particle.VS.hlsl", L"vs_6_0");
+	pixelShaderBlob_ = shaderCompiler_->Compile(L"Particle.PS.hlsl", L"ps_6_0");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
+	// Particle自身のRootSignatureを指定する
 	pipelineDesc.pRootSignature = rootSignature_.Get();
 	pipelineDesc.InputLayout = inputLayout;
 	pipelineDesc.VS = { vertexShaderBlob_->GetBufferPointer(), vertexShaderBlob_->GetBufferSize() };
@@ -240,8 +254,9 @@ void Particle::CreatePipelineState() {
 	pipelineDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	// 物体との前後関係は判定するが、パーティクル自身は深度を書かない
 	depthStencilDesc.DepthEnable = true;
-	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 	pipelineDesc.DepthStencilState = depthStencilDesc;
 	pipelineDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
@@ -250,30 +265,25 @@ void Particle::CreatePipelineState() {
 	assert(SUCCEEDED(hr));
 }
 
-void Particle::CreateConstantBuffers() {
-	wvpResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(TransformationMatrix));
-	wvpResource_->Map(0, nullptr, reinterpret_cast<void**>(&wvpData_));
-	wvpData_->WVP = MatrixUtility::MakeIdentity4x4();
-	wvpData_->World = MatrixUtility::MakeIdentity4x4();
+void Particle::CreateConstantBuffers()
+{
 
 	materialResources_.resize(modelData_.materials.size());
-	for (MaterialGpuResource& material : materialResources_) {
+	for (MaterialGpuResource& material : materialResources_)
+	{
 		material.materialResource = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Material));
 		material.materialResource->Map(0, nullptr, reinterpret_cast<void**>(&material.materialData));
 		material.materialData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-		material.materialData->lightingMode = static_cast<int32_t>(LightingMode::HalfLambert);
+		material.materialData->lightingMode = static_cast<int32_t>(LightingMode::None);
 		material.materialData->uvTransform = MatrixUtility::MakeIdentity4x4();
 	}
 
-	directionalLightResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(DirectionalLight));
-	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData_));
-	directionalLightData_->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightData_->direction = { 0.0f, -1.0f, 0.0f };
-	directionalLightData_->intensity = 1.0f;
 }
 
-void Particle::CreateTexture() {
-	for (uint32_t materialIndex = 0; materialIndex < modelData_.materials.size(); ++materialIndex) {
+void Particle::CreateTexture() 
+{
+	for (uint32_t materialIndex = 0; materialIndex < modelData_.materials.size(); ++materialIndex)
+	{
 		const MaterialData& materialData = modelData_.materials[materialIndex];
 		MaterialGpuResource& materialResource = materialResources_[materialIndex];
 		DirectX::ScratchImage mipImages = DirectXResource::LoadTexture(materialData.textureFilePath);
@@ -292,12 +302,14 @@ void Particle::CreateTexture() {
 	}
 }
 
-void Particle::CreateVertexBuffer() {
+void Particle::CreateVertexBuffer()
+{
 	
 	CreateQuadVertices();
 
 	meshResources_.resize(modelData_.meshes.size());
-	for (uint32_t meshIndex = 0; meshIndex < modelData_.meshes.size(); ++meshIndex) {
+	for (uint32_t meshIndex = 0; meshIndex < modelData_.meshes.size(); ++meshIndex)
+	{
 		const MeshData& mesh = modelData_.meshes[meshIndex];
 		MeshGpuResource& meshResource = meshResources_[meshIndex];
 		meshResource.vertexResource = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * mesh.vertices.size());
@@ -311,7 +323,8 @@ void Particle::CreateVertexBuffer() {
 	}
 }
 
-void Particle::CreateSphereVertices() {
+void Particle::CreateSphereVertices()
+{
 	constexpr uint32_t kSubdivisionX = 32;
 	constexpr uint32_t kSubdivisionY = 16;
 	constexpr float kPi = 3.14159265f;
@@ -322,12 +335,14 @@ void Particle::CreateSphereVertices() {
 	MeshData& sphere = modelData_.meshes.back();
 	sphere.vertices.reserve(kSubdivisionX * kSubdivisionY * 6);
 
-	for (uint32_t y = 0; y < kSubdivisionY; ++y) {
+	for (uint32_t y = 0; y < kSubdivisionY; ++y)
+	{
 		const float v0 = static_cast<float>(y) / static_cast<float>(kSubdivisionY);
 		const float v1 = static_cast<float>(y + 1) / static_cast<float>(kSubdivisionY);
 		const float phi0 = v0 * kPi;
 		const float phi1 = v1 * kPi;
-		for (uint32_t x = 0; x < kSubdivisionX; ++x) {
+		for (uint32_t x = 0; x < kSubdivisionX; ++x)
+		{
 			const float u0 = static_cast<float>(x) / static_cast<float>(kSubdivisionX);
 			const float u1 = static_cast<float>(x + 1) / static_cast<float>(kSubdivisionX);
 			const float theta0 = u0 * 2.0f * kPi;
@@ -346,35 +361,74 @@ void Particle::CreateSphereVertices() {
 	}
 }
 
-void Particle::CreateQuadVertices() {
+void Particle::CreateQuadVertices()
+{
 	modelData_ = {};
 
-	modelData_.materials.push_back({
-		"Particle Material",
-		"resources/uvChecker.png"
-		});
+	modelData_.materials.push_back({ "Particle Material", "resources/uvChecker.png" });
 
 	modelData_.meshes.push_back({ "Particle Quad", {}, 0 });
 
 	auto& vertices = modelData_.meshes[0].vertices;
 
-	vertices = {
+	vertices = 
+	{
 		{ { 1.0f,  1.0f, 0.0f, 1.0f},
+		  {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+
+		{ {-1.0f,  1.0f, 0.0f, 1.0f},
 		  {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
 
-		{ {-1.0f,  1.0f, 0.0f, 1.0f},
-		  {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+		{ { 1.0f, -1.0f, 0.0f, 1.0f},
+		  {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
 
 		{ { 1.0f, -1.0f, 0.0f, 1.0f},
-		  {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
-
-		{ { 1.0f, -1.0f, 0.0f, 1.0f},
-		  {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+		  {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
 
 		{ {-1.0f,  1.0f, 0.0f, 1.0f},
-		  {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
+		  {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} },
 
 		{ {-1.0f, -1.0f, 0.0f, 1.0f},
-		  {1.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
+		  {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} },
 	};
+}
+
+void Particle::CreateInstancingResource()
+{
+	instancingResource_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(TransformationMatrix) * kMaxInstanceCount);
+
+	const HRESULT hr = instancingResource_->Map(0, nullptr, reinterpret_cast<void**>(&instancingData_));
+	assert(SUCCEEDED(hr));
+
+	for (uint32_t i = 0; i < kMaxInstanceCount; ++i)
+	{
+		instancingData_[i].WVP = MatrixUtility::MakeIdentity4x4();
+		instancingData_[i].World = MatrixUtility::MakeIdentity4x4();
+
+		// 奥の板から手前の板へ順に描く
+		const float layer = static_cast<float>(kMaxInstanceCount - 1 - i);
+
+		transforms_[i].scale = { 1.0f, 1.0f, 1.0f };
+		transforms_[i].rotate = { 0.0f, 0.0f, 0.0f };
+		transforms_[i].translate = {
+			 layer * 0.12f,  // 奥ほど右
+			-layer * 0.09f,  // 奥ほど下
+			 layer * 0.15f   // 奥ほど遠く
+		};
+	}
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc{};
+	srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+	srvDesc.Buffer.FirstElement = 0;
+	srvDesc.Buffer.NumElements = kMaxInstanceCount;
+	srvDesc.Buffer.StructureByteStride = static_cast<UINT>(sizeof(TransformationMatrix));
+	srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+
+	const uint32_t srvIndex = dxCommon_->AllocateSrvIndex();
+
+	dxCommon_->GetDevice()->CreateShaderResourceView(instancingResource_.Get(), &srvDesc, dxCommon_->GetSrvCpuHandle(srvIndex));
+
+	instancingSrvHandleGPU_ = dxCommon_->GetSrvGpuHandle(srvIndex);
 }

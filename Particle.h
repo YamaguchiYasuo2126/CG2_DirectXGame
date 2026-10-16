@@ -52,6 +52,9 @@ private:
 	void CreateSphereVertices();
 	void CreateQuadVertices();
 
+	// バッファとSRVを作る関数
+	void CreateInstancingResource();
+
 	struct MeshGpuResource {
 		Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
 		D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
@@ -80,10 +83,6 @@ private:
 	// 描画するオブジェクトが使うバッファとテクスチャ。
 	std::vector<MeshGpuResource> meshResources_;
 	std::vector<MaterialGpuResource> materialResources_;
-
-	// 平行光源用のリソースとデータポインタ
-	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
-	DirectionalLight* directionalLightData_ = nullptr;
 
 	// 行列10個分のリソース
 	static constexpr uint32_t kMaxInstanceCount = 10;

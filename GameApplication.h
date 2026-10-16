@@ -8,6 +8,7 @@
 #include "Sprite.h"
 #include "Input.h"
 #include "DebugCamera.h"
+#include "Particle.h"
 
 // アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
 class GameApplication {
@@ -47,5 +48,6 @@ private:
 	Object3d multiMaterial3d_;
 	Object3d fence3d_;
 	Sprite sprite_;
+	Particle particle_;
 	bool initialized_ = false;
 };

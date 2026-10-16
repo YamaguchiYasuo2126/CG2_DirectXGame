@@ -7,8 +7,10 @@
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
 
-namespace {
-void ApplyEditorStyle() {
+namespace
+{
+void ApplyEditorStyle()
+{
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.WindowRounding = 0.0f;
 	style.ChildRounding = 0.0f;
@@ -38,7 +40,8 @@ void ApplyEditorStyle() {
 }
 #endif
 
-void GameApplication::Initialize() {
+void GameApplication::Initialize()
+{
 	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化します。
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
@@ -60,20 +63,24 @@ void GameApplication::Initialize() {
 	multiMesh3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMesh.obj", "Multi Mesh");
 	multiMaterial3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMaterial.obj", "Multi Material");
 	sprite_.Initialize(&dxCommon_);
+	particle_.Initialize(&dxCommon_, &shaderCompiler_, &logger_);
 	debugCamera_.Initialize();
 	InitializeImGui();
 	initialized_ = true;
 }
 
-void GameApplication::SetBgmControls(BgmControlCallback play, BgmControlCallback stop, void* context) {
+void GameApplication::SetBgmControls(BgmControlCallback play, BgmControlCallback stop, void* context) 
+{
 	playBgm_ = play;
 	stopBgm_ = stop;
 	bgmContext_ = context;
 	isBgmPlaying_ = false;
 }
 
-void GameApplication::Run() {
-	while (winApp_.ProcessMessage()) {
+void GameApplication::Run() 
+{
+	while (winApp_.ProcessMessage())
+	{
 		// 1フレーム分のUIとDirectX描画コマンドを積みます。
 		BeginImGuiFrame();
 		dxCommon_.BeginFrame();
@@ -85,19 +92,26 @@ void GameApplication::Run() {
 		ImGui::SetNextWindowPos(ImVec2(750.0f, 74.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(350.0f, 0.0f), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Settings");
-		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+		{
 			ImGui::Checkbox("Debug Camera Active", &isDebugCameraActive_);
 		}
-		if (ImGui::CollapsingHeader("BGM", ImGuiTreeNodeFlags_DefaultOpen)) {
-			if (ImGui::Button("Play") && playBgm_ != nullptr) {
+
+		if (ImGui::CollapsingHeader("BGM", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::Button("Play") && playBgm_ != nullptr)
+			{
 				playBgm_(bgmContext_);
 				isBgmPlaying_ = true;
 			}
+
 			ImGui::SameLine();
-			if (ImGui::Button("Stop") && stopBgm_ != nullptr) {
+			if (ImGui::Button("Stop") && stopBgm_ != nullptr)
+			{
 				stopBgm_(bgmContext_);
 				isBgmPlaying_ = false;
 			}
+
 			ImGui::Text("Status: %s", isBgmPlaying_ ? "Playing" : "Stopped");
 		}
 		ImGui::End();
@@ -105,12 +119,14 @@ void GameApplication::Run() {
 
 		Matrix4x4 viewProjection;
 
-		if (isDebugCameraActive_) {
+		if (isDebugCameraActive_)
+		{
 			// デバッグカメラがONのとき
 			debugCamera_.Update(&input_);
 			viewProjection = debugCamera_.GetViewProjectionMatrix();
 		}
-		else {
+		else
+		{
 			// デバッグカメラがOFFのとき（通常のカメラ）
 			// 通常カメラの行列を計算する
 			Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(
@@ -118,6 +134,7 @@ void GameApplication::Run() {
 				normalCameraTransform_.rotate,
 				normalCameraTransform_.translate
 			);
+
 			Matrix4x4 viewMatrix = MatrixUtility::Inverse(cameraMatrix);
 			Matrix4x4 projectionMatrix = MatrixUtility::MakePerspectiveFovMatrix(
 				0.45f,
@@ -136,6 +153,7 @@ void GameApplication::Run() {
 		fence3d_.SetViewProjectionMatrix(viewProjection);
 		multiMesh3d_.SetViewProjectionMatrix(viewProjection);
 		multiMaterial3d_.SetViewProjectionMatrix(viewProjection);
+		particle_.SetViewProjectionMatrix(viewProjection);
 
 		// ゲーム側の更新と描画です。描画対象が増えたらこの周辺に追加します。
 		object3d_.Update();
@@ -146,7 +164,8 @@ void GameApplication::Run() {
 		multiMesh3d_.Update();
 		multiMaterial3d_.Update();
 		sprite_.Update();
-		
+		particle_.Update();
+
 		// ImGuiのUI更新
 		sprite_.DrawImGui();
 		object3d_.DrawImGui();
@@ -158,27 +177,31 @@ void GameApplication::Run() {
 		multiMaterial3d_.DrawImGui();
 
 		// 描画
-		object3d_.Draw();
+		//object3d_.Draw();
 		/*sphere3d_.Draw();
 		teapot3d_.Draw();
 		bunny3d_.Draw();
 		multiMesh3d_.Draw();
 		multiMaterial3d_.Draw();
 		sprite_.Draw();*/
-		fence3d_.Draw();
+		//fence3d_.Draw();
+		particle_.Draw();
 
 		EndImGuiFrame();
 		dxCommon_.EndFrame();
 	}
 }
 
-void GameApplication::Finalize() {
-	if (!initialized_) {
+void GameApplication::Finalize()
+{
+	if (!initialized_)
+	{
 		return;
 	}
 
 	// 初期化と逆順に解放します。参照先が先に消えないようにするためです。
 	FinalizeImGui();
+	particle_.Finalize();
 	sprite_.Finalize();
 	multiMaterial3d_.Finalize();
 	multiMesh3d_.Finalize();
