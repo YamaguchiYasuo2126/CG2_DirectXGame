@@ -24,9 +24,16 @@ class DirectXCommon;
 class Logger;
 class ShaderCompiler;
 
+struct Particle
+{
+	Transform transform;
+	Vector3 velocity;
+};
+
 class Particle
 {
 public:
+
 	void Initialize(
 		DirectXCommon* dxCommon,
 		ShaderCompiler* shaderCompiler,
@@ -55,7 +62,8 @@ private:
 	// バッファとSRVを作る関数
 	void CreateInstancingResource();
 
-	struct MeshGpuResource {
+	struct MeshGpuResource
+	{
 		Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
 		D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	};
@@ -106,7 +114,6 @@ private:
 	bool useMonsterBall_ = true;
 
 	// オブジェクト自身とカメラのTransform
-	// OBJ の Plane は +Z 側を表面としているため、起動時からカメラ側 (-Z) を向けます。
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 3.14159265f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 

@@ -5,7 +5,8 @@
 #include <cstdint>
 #include "Matrix4x4.h"
 
-enum class LightingMode : int32_t {
+enum class LightingMode : int32_t
+{
     None = 0,
     Lambert = 1,
     HalfLambert = 2,
