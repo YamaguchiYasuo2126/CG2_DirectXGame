@@ -5,7 +5,8 @@
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 #endif
 
-void WinApp::Initialize() {
+void WinApp::Initialize()
+{
 	// Windowsへ登録するWindowClassを作成します。
 	windowClass_.lpfnWndProc = WindowProc;
 	windowClass_.lpszClassName = L"CG2WindowClass";
@@ -34,7 +35,8 @@ void WinApp::Initialize() {
 	ShowWindow(hwnd_, SW_SHOW);
 }
 
-void WinApp::Finalize() {
+void WinApp::Finalize() 
+{
 	// Windowが残っている場合だけ閉じます。
 	if (hwnd_ != nullptr) {
 		CloseWindow(hwnd_);

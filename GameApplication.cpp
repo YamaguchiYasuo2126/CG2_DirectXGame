@@ -55,13 +55,21 @@ void GameApplication::Initialize()
 
 	dxCommon_.Initialize(winApp_.GetHwnd(), WinApp::kClientWidth, WinApp::kClientHeight, &logger_);
 	shaderCompiler_.Initialize(&logger_);
-	object3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "plane.obj", "Plane");
-	sphere3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "sphere", "Sphere");
-	teapot3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "teapot.obj", "Utah Teapot");
-	bunny3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "bunny.obj", "Stanford Bunny");
-	multiMesh3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMesh.obj", "Multi Mesh");
-	multiMaterial3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMaterial.obj", "Multi Material");
-	sprite_.Initialize(&dxCommon_);
+	// インスタンスの生成と、描画リソースの初期化を分ける。
+	object3d_ = new Object3d();
+	object3d_->Initialize(&dxCommon_, &shaderCompiler_, &logger_, "plane.obj", "Plane");
+	sphere3d_ = new Object3d();
+	sphere3d_->Initialize(&dxCommon_, &shaderCompiler_, &logger_, "sphere", "Sphere");
+	teapot3d_ = new Object3d();
+	teapot3d_->Initialize(&dxCommon_, &shaderCompiler_, &logger_, "teapot.obj", "Utah Teapot");
+	bunny3d_ = new Object3d();
+	bunny3d_->Initialize(&dxCommon_, &shaderCompiler_, &logger_, "bunny.obj", "Stanford Bunny");
+	multiMesh3d_ = new Object3d();
+	multiMesh3d_->Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMesh.obj", "Multi Mesh");
+	multiMaterial3d_ = new Object3d();
+	multiMaterial3d_->Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMaterial.obj", "Multi Material");
+	sprite_ = new Sprite();
+	sprite_->Initialize(&dxCommon_);
 	debugCamera_.Initialize();
 	InitializeImGui();
 	initialized_ = true;
@@ -79,7 +87,7 @@ void GameApplication::Run()
 {
 	while (winApp_.ProcessMessage())
 	{
-		// 1フレーム分のUIとDirectX描画コマンドを積みます。
+		// 1フレーム分のUIとDirectX描画コマンドを積む。
 		BeginImGuiFrame();
 		dxCommon_.BeginFrame();
 
@@ -143,39 +151,39 @@ void GameApplication::Run()
 		}
 
 		// 決定した行列をオブジェクトに渡す
-		object3d_.SetViewProjectionMatrix(viewProjection);
-		sphere3d_.SetViewProjectionMatrix(viewProjection);
-		teapot3d_.SetViewProjectionMatrix(viewProjection);
-		bunny3d_.SetViewProjectionMatrix(viewProjection);
-		multiMesh3d_.SetViewProjectionMatrix(viewProjection);
-		multiMaterial3d_.SetViewProjectionMatrix(viewProjection);
+		object3d_->SetViewProjectionMatrix(viewProjection);
+		sphere3d_->SetViewProjectionMatrix(viewProjection);
+		teapot3d_->SetViewProjectionMatrix(viewProjection);
+		bunny3d_->SetViewProjectionMatrix(viewProjection);
+		multiMesh3d_->SetViewProjectionMatrix(viewProjection);
+		multiMaterial3d_->SetViewProjectionMatrix(viewProjection);
 
 		// ゲーム側の更新と描画です。描画対象が増えたらこの周辺に追加します。
-		object3d_.Update();
-		sphere3d_.Update();
-		teapot3d_.Update();
-		bunny3d_.Update();
-		multiMesh3d_.Update();
-		multiMaterial3d_.Update();
-		sprite_.Update();
+		object3d_->Update();
+		sphere3d_->Update();
+		teapot3d_->Update();
+		bunny3d_->Update();
+		multiMesh3d_->Update();
+		multiMaterial3d_->Update();
+		sprite_->Update();
 		
 		// ImGuiのUI更新
-		sprite_.DrawImGui();
-		object3d_.DrawImGui();
-		sphere3d_.DrawImGui();
-		teapot3d_.DrawImGui();
-		bunny3d_.DrawImGui();
-		multiMesh3d_.DrawImGui();
-		multiMaterial3d_.DrawImGui();
+		sprite_->DrawImGui();
+		object3d_->DrawImGui();
+		sphere3d_->DrawImGui();
+		teapot3d_->DrawImGui();
+		bunny3d_->DrawImGui();
+		multiMesh3d_->DrawImGui();
+		multiMaterial3d_->DrawImGui();
 
 		// 描画
-		object3d_.Draw();
-		/*sphere3d_.Draw();
-		teapot3d_.Draw();
-		bunny3d_.Draw();
-		multiMesh3d_.Draw();
-		multiMaterial3d_.Draw();
-		sprite_.Draw();*/
+		object3d_->Draw();
+		/*sphere3d_->Draw();
+		teapot3d_->Draw();
+		bunny3d_->Draw();
+		multiMesh3d_->Draw();
+		multiMaterial3d_->Draw();
+		sprite_->Draw();*/
 
 		EndImGuiFrame();
 		dxCommon_.EndFrame();
@@ -189,15 +197,29 @@ void GameApplication::Finalize()
 		return;
 	}
 
-	// 初期化と逆順に解放します。参照先が先に消えないようにするためです。
+	// 初期化と逆順に解放。参照先が先に消えないようにする。
 	FinalizeImGui();
-	sprite_.Finalize();
-	multiMaterial3d_.Finalize();
-	multiMesh3d_.Finalize();
-	bunny3d_.Finalize();
-	teapot3d_.Finalize();
-	sphere3d_.Finalize();
-	object3d_.Finalize();
+	sprite_->Finalize();
+	delete sprite_;
+	sprite_ = nullptr;
+	multiMaterial3d_->Finalize();
+	delete multiMaterial3d_;
+	multiMaterial3d_ = nullptr;
+	multiMesh3d_->Finalize();
+	delete multiMesh3d_;
+	multiMesh3d_ = nullptr;
+	bunny3d_->Finalize();
+	delete bunny3d_;
+	bunny3d_ = nullptr;
+	teapot3d_->Finalize();
+	delete teapot3d_;
+	teapot3d_ = nullptr;
+	sphere3d_->Finalize();
+	delete sphere3d_;
+	sphere3d_ = nullptr;
+	object3d_->Finalize();
+	delete object3d_;
+	object3d_ = nullptr;
 	shaderCompiler_.Finalize();
 	dxCommon_.Finalize();
 	winApp_.Finalize();
@@ -210,7 +232,7 @@ void GameApplication::Finalize()
 void GameApplication::InitializeImGui()
 {
 #ifdef USE_IMGUI
-	// ImGuiが描画に使うSRVは先頭0番を予約しています。
+	// ImGuiが描画に使うSRVは先頭0番を予約。
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
@@ -231,7 +253,7 @@ void GameApplication::InitializeImGui()
 void GameApplication::BeginImGuiFrame()
 {
 #ifdef USE_IMGUI
-	// ImGuiの各バックエンドへ、新しいフレームの開始を通知します。
+	// ImGuiの各バックエンドへ、新しいフレームの開始を通知。
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
@@ -241,7 +263,7 @@ void GameApplication::BeginImGuiFrame()
 void GameApplication::EndImGuiFrame()
 {
 #ifdef USE_IMGUI
-	// 作成されたImGuiの描画データを、現在のDirectXコマンドリストへ積みます。
+	// 作成されたImGuiの描画データを、現在のDirectXコマンドリストへ積む。
 	ImGui::Render();
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dxCommon_.GetCommandList());
 #endif

@@ -14,6 +14,9 @@ class GameApplication
 {
 public:
 	using BgmControlCallback = void(*)(void*);
+	GameApplication() = default;
+	GameApplication(const GameApplication&) = delete;
+	GameApplication& operator=(const GameApplication&) = delete;
 
 	void Initialize();
 	void Run();
@@ -40,13 +43,13 @@ private:
 	Transform normalCameraTransform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 	DebugCamera debugCamera_;
 	ShaderCompiler shaderCompiler_;
-	Object3d object3d_;
-	Object3d sphere3d_;
-	Object3d teapot3d_;
-	Object3d bunny3d_;
-	Object3d multiMesh3d_;
-	Object3d multiMaterial3d_;
-	Object3d fence3d_;
-	Sprite sprite_;
+	// 描画対象はInitializeで生成し、Finalizeで破棄する。
+	Object3d* object3d_ = nullptr;
+	Object3d* sphere3d_ = nullptr;
+	Object3d* teapot3d_ = nullptr;
+	Object3d* bunny3d_ = nullptr;
+	Object3d* multiMesh3d_ = nullptr;
+	Object3d* multiMaterial3d_ = nullptr;
+	Sprite* sprite_ = nullptr;
 	bool initialized_ = false;
 };
