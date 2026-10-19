@@ -1,7 +1,8 @@
 #include "DebugCamera.h"
 #include "MatrixUtility.h"
 
-void DebugCamera::Initialize() {
+void DebugCamera::Initialize()
+{
 	// 射影行列（Projection行列）の初期化
 	matProjection_ = MatrixUtility::MakePerspectiveFovMatrix(
 		0.45f,
@@ -15,30 +16,41 @@ void DebugCamera::Initialize() {
 	matViewProjection_ = MatrixUtility::MakeIdentity4x4();
 }
 
-void DebugCamera::Update(Input* input) {
+void DebugCamera::Update(Input* input)
+{
 	//入力によるカメラの移動や回転
 
 	// 回転処理
 	const float kRotateSpeed = 0.02f;
 
-	if (input->PushKey(DIK_UP)) {
+	if (input->PushKey(DIK_UP))
+	{
 		rotation_.x -= kRotateSpeed; // X軸周りの角度を加算
 	}
-	if (input->PushKey(DIK_DOWN)) {
+
+	if (input->PushKey(DIK_DOWN))
+	{
 		rotation_.x += kRotateSpeed;
 	}
-	if (input->PushKey(DIK_LEFT)) {
+
+	if (input->PushKey(DIK_LEFT))
+	{
 		rotation_.y -= kRotateSpeed; // Y軸周りの角度を加算
 	}
-	if (input->PushKey(DIK_RIGHT)) {
+
+	if (input->PushKey(DIK_RIGHT))
+	{
 		rotation_.y += kRotateSpeed;
 	}
 
 	// Z軸周りの回転（ロール）を追加
-	if (input->PushKey(DIK_Z)) {
+	if (input->PushKey(DIK_Z))
+	{
 		rotation_.z -= kRotateSpeed;
 	}
-	if (input->PushKey(DIK_X)) {
+
+	if (input->PushKey(DIK_X))
+	{
 		rotation_.z += kRotateSpeed;
 	}
 

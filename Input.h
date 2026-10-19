@@ -19,8 +19,19 @@ public:
     // 毎フレーム行う更新処理（キーボードの入力状態を取得するなど）
     void Update();
 
-    bool PushKey(uint8_t keyNum);    // 押しているか
-    bool TriggerKey(uint8_t keyNum); // 押した瞬間か
+    /// <summary>
+    /// キーの押下をチェック
+    /// </summary>
+    /// <param name="keyNum"></param>
+    /// <returns>押しているか</returns>
+    bool PushKey(uint8_t keyNum);
+
+    /// <summary>
+    /// キーのトリガーをチェック
+    /// </summary>
+    /// <param name="keyNum"></param>
+    /// <returns>押した瞬間か</returns>
+    bool TriggerKey(uint8_t keyNum);
 
 private:
     // DirectInputのポインタをComPtrで管理
