@@ -7,8 +7,10 @@
 #include "externals/imgui/imgui_impl_dx12.h"
 #include "externals/imgui/imgui_impl_win32.h"
 
-namespace {
-void ApplyEditorStyle() {
+namespace
+{
+void ApplyEditorStyle()
+{
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.WindowRounding = 0.0f;
 	style.ChildRounding = 0.0f;
@@ -38,7 +40,8 @@ void ApplyEditorStyle() {
 }
 #endif
 
-void GameApplication::Initialize() {
+void GameApplication::Initialize()
+{
 	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化します。
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
@@ -64,15 +67,18 @@ void GameApplication::Initialize() {
 	initialized_ = true;
 }
 
-void GameApplication::SetBgmControls(BgmControlCallback play, BgmControlCallback stop, void* context) {
+void GameApplication::SetBgmControls(BgmControlCallback play, BgmControlCallback stop, void* context)
+{
 	playBgm_ = play;
 	stopBgm_ = stop;
 	bgmContext_ = context;
 	isBgmPlaying_ = false;
 }
 
-void GameApplication::Run() {
-	while (winApp_.ProcessMessage()) {
+void GameApplication::Run() 
+{
+	while (winApp_.ProcessMessage())
+	{
 		// 1フレーム分のUIとDirectX描画コマンドを積みます。
 		BeginImGuiFrame();
 		dxCommon_.BeginFrame();
@@ -84,19 +90,26 @@ void GameApplication::Run() {
 		ImGui::SetNextWindowPos(ImVec2(750.0f, 74.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(350.0f, 0.0f), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Settings");
-		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
+		{
 			ImGui::Checkbox("Debug Camera Active", &isDebugCameraActive_);
 		}
-		if (ImGui::CollapsingHeader("BGM", ImGuiTreeNodeFlags_DefaultOpen)) {
-			if (ImGui::Button("Play") && playBgm_ != nullptr) {
+
+		if (ImGui::CollapsingHeader("BGM", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			if (ImGui::Button("Play") && playBgm_ != nullptr)
+			{
 				playBgm_(bgmContext_);
 				isBgmPlaying_ = true;
 			}
+
 			ImGui::SameLine();
-			if (ImGui::Button("Stop") && stopBgm_ != nullptr) {
+			if (ImGui::Button("Stop") && stopBgm_ != nullptr)
+			{
 				stopBgm_(bgmContext_);
 				isBgmPlaying_ = false;
 			}
+
 			ImGui::Text("Status: %s", isBgmPlaying_ ? "Playing" : "Stopped");
 		}
 		ImGui::End();
@@ -104,12 +117,14 @@ void GameApplication::Run() {
 
 		Matrix4x4 viewProjection;
 
-		if (isDebugCameraActive_) {
+		if (isDebugCameraActive_)
+		{
 			// デバッグカメラがONのとき
 			debugCamera_.Update(&input_);
 			viewProjection = debugCamera_.GetViewProjectionMatrix();
 		}
-		else {
+		else 
+		{
 			// デバッグカメラがOFFのとき（通常のカメラ）
 			// 通常カメラの行列を計算する
 			Matrix4x4 cameraMatrix = MatrixUtility::MakeAffineMatrix(
@@ -167,8 +182,10 @@ void GameApplication::Run() {
 	}
 }
 
-void GameApplication::Finalize() {
-	if (!initialized_) {
+void GameApplication::Finalize()
+{
+	if (!initialized_)
+	{
 		return;
 	}
 
@@ -190,7 +207,8 @@ void GameApplication::Finalize() {
 	initialized_ = false;
 }
 
-void GameApplication::InitializeImGui() {
+void GameApplication::InitializeImGui()
+{
 #ifdef USE_IMGUI
 	// ImGuiが描画に使うSRVは先頭0番を予約しています。
 	IMGUI_CHECKVERSION();
@@ -210,7 +228,8 @@ void GameApplication::InitializeImGui() {
 #endif
 }
 
-void GameApplication::BeginImGuiFrame() {
+void GameApplication::BeginImGuiFrame()
+{
 #ifdef USE_IMGUI
 	// ImGuiの各バックエンドへ、新しいフレームの開始を通知します。
 	ImGui_ImplDX12_NewFrame();
@@ -219,7 +238,8 @@ void GameApplication::BeginImGuiFrame() {
 #endif
 }
 
-void GameApplication::EndImGuiFrame() {
+void GameApplication::EndImGuiFrame()
+{
 #ifdef USE_IMGUI
 	// 作成されたImGuiの描画データを、現在のDirectXコマンドリストへ積みます。
 	ImGui::Render();
@@ -227,7 +247,8 @@ void GameApplication::EndImGuiFrame() {
 #endif
 }
 
-void GameApplication::FinalizeImGui() {
+void GameApplication::FinalizeImGui()
+{
 #ifdef USE_IMGUI
 	ImGui_ImplDX12_Shutdown();
 	ImGui_ImplWin32_Shutdown();

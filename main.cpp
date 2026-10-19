@@ -216,9 +216,11 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 
 	// XAudio2解放
 	StopBgm(&bgmContext);
-	if (masterVoice != nullptr) {
+	if (masterVoice != nullptr)
+	{
 		masterVoice->DestroyVoice();
 	}
+
 	xAudio2.Reset();
 
 	// 音声データ開放

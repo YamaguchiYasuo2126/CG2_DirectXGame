@@ -1,13 +1,17 @@
 #pragma once
 #include <Windows.h>
 
-#define DIRECTINPUT_VERSION 0x0800 // ヘッダより上に書く
+#define DIRECTINPUT_VERSION 0x0800 // dinput.hより上に書く
 #include <dinput.h>
 #include <wrl.h>
 #include <stdint.h>
 
 class Input
 {
+public:
+    // namespace省略
+    template <class T> using ComPtr = Microsoft::WRL::ComPtr<T>;
+
 public:
     // 初期化（ウィンドウ生成時に得られる情報をもらう）
     void Initialize(HINSTANCE hInstance, HWND hwnd);
@@ -19,9 +23,10 @@ public:
     bool TriggerKey(uint8_t keyNum); // 押した瞬間か
 
 private:
-    // スライドにあったポインタたちをComPtrで管理
-    Microsoft::WRL::ComPtr<IDirectInput8> directInput_;
-    Microsoft::WRL::ComPtr<IDirectInputDevice8> keyboard_;
+    // DirectInputのポインタをComPtrで管理
+    ComPtr<IDirectInput8> directInput_;
+    // キーボードデバイスのポインタをComPtrで管理
+    ComPtr<IDirectInputDevice8> keyboard_;
 
     // 全キーの入力状態を保存する配列（今フレームと前フレーム）
     BYTE key_[256] = {};

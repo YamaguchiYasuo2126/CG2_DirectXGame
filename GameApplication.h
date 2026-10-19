@@ -9,8 +9,9 @@
 #include "Input.h"
 #include "DebugCamera.h"
 
-// アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
-class GameApplication {
+// アプリ全体の初期化、メインループ、終了処理をまとめるクラス。
+class GameApplication
+{
 public:
 	using BgmControlCallback = void(*)(void*);
 
@@ -25,7 +26,7 @@ private:
 	void EndImGuiFrame();
 	void FinalizeImGui();
 
-	// 各機能クラスをここで所有し、寿命をまとめて管理します。
+	// 各機能クラスをここで所有し、寿命をまとめて管理。
 	Logger logger_;
 	WinApp winApp_;
 	DirectXCommon dxCommon_;
