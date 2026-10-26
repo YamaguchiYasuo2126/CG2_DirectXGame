@@ -5,12 +5,12 @@
 #pragma comment(lib, "dinput8.lib")
 #pragma comment(lib, "dxguid.lib")
 
-void Input::Initialize(HINSTANCE hInstance, HWND hwnd)
+void Input::Initialize(WinApp* winApp)
 {
-    HRESULT hr;
+    assert(winApp != nullptr);
+    winApp_ = winApp;
 
-    // DirectInputオブジェクトの生成
-    hr = DirectInput8Create(hInstance, DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput_, nullptr);
+    HRESULT hr = DirectInput8Create(winApp_->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput_, nullptr);
     assert(SUCCEEDED(hr));
 
     // キーボードデバイスの生成
@@ -22,7 +22,7 @@ void Input::Initialize(HINSTANCE hInstance, HWND hwnd)
     assert(SUCCEEDED(hr));
 
     // 排他制御レベルのセット
-    hr = keyboard_->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+    hr = keyboard_->SetCooperativeLevel(winApp_->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
     assert(SUCCEEDED(hr));
 }
 
@@ -36,6 +36,18 @@ void Input::Update()
 
     // 全キーの入力状態を取得する
     keyboard_->GetDeviceState(sizeof(key_), key_);
+}
+
+void Input::Finalize()
+{
+    if (keyboard_.Get() != nullptr)
+    {
+        keyboard_->Unacquire();
+    }
+
+    keyboard_.Reset();
+    directInput_.Reset();
+    winApp_ = nullptr;
 }
 
 // 押しているか（今のフレームで0x80ならtrue）

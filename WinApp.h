@@ -15,6 +15,7 @@ public:
 	bool ProcessMessage();
 
 	HWND GetHwnd() const { return hwnd_; }
+	HINSTANCE GetHInstance() const { return windowClass_.hInstance; }
 
 private:
 	// Windowsから呼び出されるメッセージ処理関数です。

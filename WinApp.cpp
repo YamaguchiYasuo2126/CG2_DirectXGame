@@ -7,6 +7,9 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 void WinApp::Initialize()
 {
+	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化します。
+	CoInitializeEx(0, COINIT_MULTITHREADED);
+
 	// Windowsへ登録するWindowClassを作成します。
 	windowClass_.lpfnWndProc = WindowProc;
 	windowClass_.lpszClassName = L"CG2WindowClass";
@@ -37,11 +40,12 @@ void WinApp::Initialize()
 
 void WinApp::Finalize() 
 {
-	// Windowが残っている場合だけ閉じます。
-	if (hwnd_ != nullptr) {
-		CloseWindow(hwnd_);
-		hwnd_ = nullptr;
+	if (hwnd_ != nullptr && IsWindow(hwnd_))
+	{
+		DestroyWindow(hwnd_);
 	}
+	hwnd_ = nullptr;
+	CoUninitialize();
 }
 
 bool WinApp::ProcessMessage() {

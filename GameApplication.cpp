@@ -42,16 +42,12 @@ void ApplyEditorStyle()
 
 void GameApplication::Initialize()
 {
-	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化します。
-	CoInitializeEx(0, COINIT_MULTITHREADED);
-
+	
 	// 依存される側から順番に初期化します。
 	logger_.Initialize();
 	winApp_.Initialize();
 
-	HINSTANCE hInstance = GetModuleHandle(nullptr); // HINSTANCEを取得
-	HWND hwnd = winApp_.GetHwnd();                  // HWNDを取得
-	input_.Initialize(hInstance, hwnd);             // Inputクラスの初期化
+	input_.Initialize(&winApp_);
 
 	dxCommon_.Initialize(winApp_.GetHwnd(), WinApp::kClientWidth, WinApp::kClientHeight, &logger_);
 	shaderCompiler_.Initialize(&logger_);
@@ -222,10 +218,10 @@ void GameApplication::Finalize()
 	object3d_ = nullptr;
 	shaderCompiler_.Finalize();
 	dxCommon_.Finalize();
+	input_.Finalize();
 	winApp_.Finalize();
 	logger_.Log("Hello,DirectX!\n");
 	logger_.Finalize();
-	CoUninitialize();
 	initialized_ = false;
 }
 

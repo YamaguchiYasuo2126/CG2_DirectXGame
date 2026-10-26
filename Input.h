@@ -1,10 +1,12 @@
 #pragma once
 #include <Windows.h>
+#include "WinApp.h"
 
 #define DIRECTINPUT_VERSION 0x0800 // dinput.hより上に書く
 #include <dinput.h>
 #include <wrl.h>
 #include <stdint.h>
+
 
 class Input
 {
@@ -14,10 +16,12 @@ public:
 
 public:
     // 初期化（ウィンドウ生成時に得られる情報をもらう）
-    void Initialize(HINSTANCE hInstance, HWND hwnd);
+    void Initialize(WinApp* winApp);
 
     // 毎フレーム行う更新処理（キーボードの入力状態を取得するなど）
     void Update();
+
+    void Finalize();
 
     /// <summary>
     /// キーの押下をチェック
@@ -34,6 +38,9 @@ public:
     bool TriggerKey(uint8_t keyNum);
 
 private:
+    // WindowsAPI
+    WinApp* winApp_ = nullptr;
+
     // DirectInputのポインタをComPtrで管理
     ComPtr<IDirectInput8> directInput_;
     // キーボードデバイスのポインタをComPtrで管理
