@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <array>
+#include <random>
 
 #include "MatrixUtility.h"
 #include "Matrix4x4.h"
@@ -24,12 +25,24 @@ class DirectXCommon;
 class Logger;
 class ShaderCompiler;
 
-struct Particle
+// 1粒の位置・速度など、CPU側で動きを管理するパーティクルデータ
+struct ParticleData
 {
 	Transform transform;
 	Vector3 velocity;
+	Vector4 color;
+	float lifeTime;
+	float currentTime;
 };
 
+struct ParticleForGPU
+{
+	Matrix4x4 WVP;
+	Matrix4x4 World;
+	Vector4 color;
+};
+
+// 描画や更新を担当するパーティクルクラス
 class Particle
 {
 public:
@@ -43,7 +56,7 @@ public:
 		const std::string& modelDirectory = "resources");
 
 	void Finalize();
-	void Update();
+	void Update(bool moveParticles);
 	void Draw();
 	void DrawImGui();
 
@@ -61,6 +74,8 @@ private:
 
 	// バッファとSRVを作る関数
 	void CreateInstancingResource();
+	// 生成関数
+	ParticleData MakeNewParticle(std::mt19937& randomEngine);
 
 	struct MeshGpuResource
 	{
@@ -68,7 +83,8 @@ private:
 		D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	};
 
-	struct MaterialGpuResource {
+	struct MaterialGpuResource
+	{
 		Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
 		Microsoft::WRL::ComPtr<ID3D12Resource> textureResource;
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU{};
@@ -92,14 +108,19 @@ private:
 	std::vector<MeshGpuResource> meshResources_;
 	std::vector<MaterialGpuResource> materialResources_;
 
-	// 行列10個分のリソース
+	// 粒の生成に使う乱数エンジンを一度だけ初期化する
+	std::mt19937 randomEngine_{ std::random_device{}() };
+
+	// バッファに確保できるパーティクルの最大数
 	static constexpr uint32_t kMaxInstanceCount = 10;
 
+	// 生存中のパーティクルの数
 	uint32_t instanceCount_ = kMaxInstanceCount;
-	std::array<Transform, kMaxInstanceCount> transforms_{};
+	// パーティクルのメンバ変数
+	std::array<ParticleData, kMaxInstanceCount> particles_{};
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_;
-	TransformationMatrix* instancingData_ = nullptr;
+	ParticleForGPU* instancingData_ = nullptr;
 
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
 
@@ -116,8 +137,6 @@ private:
 	// オブジェクト自身とカメラのTransform
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 3.14159265f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
-
-	// UVTransform用の変数
 
 	// 読み込んだモデルデータを保持する変数
 	ModelData modelData_;

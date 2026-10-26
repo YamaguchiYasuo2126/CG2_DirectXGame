@@ -42,7 +42,7 @@ void ApplyEditorStyle()
 
 void GameApplication::Initialize()
 {
-	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化します。
+	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化。
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
 	// 依存される側から順番に初期化します。
@@ -97,6 +97,11 @@ void GameApplication::Run()
 			ImGui::Checkbox("Debug Camera Active", &isDebugCameraActive_);
 		}
 
+		if (ImGui::CollapsingHeader("Particle", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::Checkbox("Update", &isParticleUpdateEnabled_);
+		}
+
 		if (ImGui::CollapsingHeader("BGM", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			if (ImGui::Button("Play") && playBgm_ != nullptr)
@@ -114,6 +119,7 @@ void GameApplication::Run()
 
 			ImGui::Text("Status: %s", isBgmPlaying_ ? "Playing" : "Stopped");
 		}
+
 		ImGui::End();
 #endif
 
@@ -164,7 +170,7 @@ void GameApplication::Run()
 		multiMesh3d_.Update();
 		multiMaterial3d_.Update();
 		sprite_.Update();
-		particle_.Update();
+		particle_.Update(isParticleUpdateEnabled_);
 
 		// ImGuiのUI更新
 		sprite_.DrawImGui();

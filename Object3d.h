@@ -24,10 +24,9 @@ class DirectXCommon;
 class Logger;
 class ShaderCompiler;
 
-
-
-// テクスチャ付き3Dオブジェクトの初期化、更新、描画を担当。
-class Object3d {
+// テクスチャ付き3Dオブジェクトの初期化、更新、描画を担当
+class Object3d
+{
 public:
 	void Initialize(
 		DirectXCommon* dxCommon,
@@ -45,7 +44,7 @@ public:
 	void SetViewProjectionMatrix(const Matrix4x4& viewProjection) { viewProjection_ = viewProjection; }
 
 private:
-	// 描画に必要なDirectXリソースを用途ごとに作成。
+	// 描画に必要なDirectXリソースを用途ごとに作成
 	void CreateRootSignature();
 	void CreatePipelineState();
 	void CreateConstantBuffers();
@@ -53,12 +52,14 @@ private:
 	void CreateVertexBuffer();
 	void CreateSphereVertices();
 
-	struct MeshGpuResource {
+	struct MeshGpuResource
+	{
 		Microsoft::WRL::ComPtr<ID3D12Resource> vertexResource;
 		D3D12_VERTEX_BUFFER_VIEW vertexBufferView{};
 	};
 
-	struct MaterialGpuResource {
+	struct MaterialGpuResource
+	{
 		Microsoft::WRL::ComPtr<ID3D12Resource> materialResource;
 		Microsoft::WRL::ComPtr<ID3D12Resource> textureResource;
 		D3D12_GPU_DESCRIPTOR_HANDLE textureSrvHandleGPU{};
@@ -102,7 +103,7 @@ private:
 	bool useMonsterBall_ = true;
 
 	// オブジェクト自身とカメラのTransform
-	// OBJ の Plane は +Z 側を表面としているため、起動時からカメラ側 (-Z) を向けます。
+	// OBJ の Plane は +Z 側を表面としているため、起動時からカメラ側 (-Z) を向く
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 3.14159265f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 

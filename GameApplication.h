@@ -10,7 +10,7 @@
 #include "DebugCamera.h"
 #include "Particle.h"
 
-// アプリ全体の初期化、メインループ、終了処理をまとめるクラスです。
+// アプリ全体の初期化、メインループ、終了処理をまとめるクラス
 class GameApplication {
 public:
 	using BgmControlCallback = void(*)(void*);
@@ -26,12 +26,14 @@ private:
 	void EndImGuiFrame();
 	void FinalizeImGui();
 
-	// 各機能クラスをここで所有し、寿命をまとめて管理します。
+	// 各機能クラスをここで所有し、寿命をまとめて管理
 	Logger logger_;
 	WinApp winApp_;
 	DirectXCommon dxCommon_;
 	Input input_;
 	bool isDebugCameraActive_ = false;
+	// パーティクルを動かすかどうか
+	bool isParticleUpdateEnabled_ = false;
 	BgmControlCallback playBgm_ = nullptr;
 	BgmControlCallback stopBgm_ = nullptr;
 	void* bgmContext_ = nullptr;
