@@ -183,7 +183,7 @@ void GameApplication::Run()
 		multiMaterial3d_.DrawImGui();
 
 		// 描画
-		//object3d_.Draw();
+		object3d_.Draw();
 		/*sphere3d_.Draw();
 		teapot3d_.Draw();
 		bunny3d_.Draw();
