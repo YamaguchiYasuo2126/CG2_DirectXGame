@@ -16,7 +16,7 @@ public:
 	/// <summary>
 	/// 更新処理
 	/// </summary>
-	void Update(Input* input);
+	void Update(Input* input, float deltaTimeSeconds);
 
 	// ゲッター関数
 	const Matrix4x4& GetMatView() const { return matView_; }

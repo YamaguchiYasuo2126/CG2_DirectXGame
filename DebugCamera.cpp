@@ -16,42 +16,43 @@ void DebugCamera::Initialize()
 	matViewProjection_ = MatrixUtility::MakeIdentity4x4();
 }
 
-void DebugCamera::Update(Input* input)
+void DebugCamera::Update(Input* input, float deltaTimeSeconds)
 {
 	//入力によるカメラの移動や回転
 
 	// 回転処理
-	const float kRotateSpeed = 0.02f;
+	const float kRotateSpeed = 1.2f; // 60FPS時の0.02ラジアン/フレームに相当
+	const float rotateStep = kRotateSpeed * deltaTimeSeconds;
 
 	if (input->PushKey(DIK_UP))
 	{
-		rotation_.x -= kRotateSpeed; // X軸周りの角度を加算
+		rotation_.x -= rotateStep; // X軸周りの角度を加算
 	}
 
 	if (input->PushKey(DIK_DOWN))
 	{
-		rotation_.x += kRotateSpeed;
+		rotation_.x += rotateStep;
 	}
 
 	if (input->PushKey(DIK_LEFT))
 	{
-		rotation_.y -= kRotateSpeed; // Y軸周りの角度を加算
+		rotation_.y -= rotateStep; // Y軸周りの角度を加算
 	}
 
 	if (input->PushKey(DIK_RIGHT))
 	{
-		rotation_.y += kRotateSpeed;
+		rotation_.y += rotateStep;
 	}
 
 	// Z軸周りの回転（ロール）を追加
 	if (input->PushKey(DIK_Z))
 	{
-		rotation_.z -= kRotateSpeed;
+		rotation_.z -= rotateStep;
 	}
 
 	if (input->PushKey(DIK_X))
 	{
-		rotation_.z += kRotateSpeed;
+		rotation_.z += rotateStep;
 	}
 
 	// 現在の回転角度から回転行列を作成しておく（移動ベクトルの回転用）
@@ -61,16 +62,17 @@ void DebugCamera::Update(Input* input)
 	Matrix4x4 matRot = MatrixUtility::Multiply(matRotX, MatrixUtility::Multiply(matRotY, matRotZ));
 
 	// 移動処理
-	const float kMoveSpeed = 0.1f;
+	const float kMoveSpeed = 6.0f; // 60FPS時の0.1単位/フレームに相当
+	const float moveStep = kMoveSpeed * deltaTimeSeconds;
 	Vector3 move = { 0.0f, 0.0f, 0.0f };
 
 	// ローカル（カメラ視点）での移動ベクトルを設定
-	if (input->PushKey(DIK_W)) { move.z += kMoveSpeed; } // 前進
-	if (input->PushKey(DIK_S)) { move.z -= kMoveSpeed; } // 後退
-	if (input->PushKey(DIK_D)) { move.x += kMoveSpeed; } // 右移動
-	if (input->PushKey(DIK_A)) { move.x -= kMoveSpeed; } // 左移動
-	if (input->PushKey(DIK_E)) { move.y += kMoveSpeed; } // 上移動
-	if (input->PushKey(DIK_Q)) { move.y -= kMoveSpeed; } // 下移動
+	if (input->PushKey(DIK_W)) { move.z += moveStep; } // 前進
+	if (input->PushKey(DIK_S)) { move.z -= moveStep; } // 後退
+	if (input->PushKey(DIK_D)) { move.x += moveStep; } // 右移動
+	if (input->PushKey(DIK_A)) { move.x -= moveStep; } // 左移動
+	if (input->PushKey(DIK_E)) { move.y += moveStep; } // 上移動
+	if (input->PushKey(DIK_Q)) { move.y -= moveStep; } // 下移動
 
 	// 移動ベクトルをカメラの向きに合わせて回転させる
 	// 方向ベクトル (move) と 回転行列 (matRot) の積を直接計算します

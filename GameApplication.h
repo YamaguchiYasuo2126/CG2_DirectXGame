@@ -8,6 +8,7 @@
 #include "Sprite.h"
 #include "Input.h"
 #include "DebugCamera.h"
+#include "FrameTimer.h"
 
 // アプリ全体の初期化、メインループ、終了処理をまとめるクラス。
 class GameApplication
@@ -43,6 +44,7 @@ private:
 	Transform normalCameraTransform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
 	DebugCamera debugCamera_;
 	ShaderCompiler shaderCompiler_;
+	FrameTimer frameTimer_;
 	// 描画対象はInitializeで生成し、Finalizeで破棄する。
 	Object3d* object3d_ = nullptr;
 	Object3d* sphere3d_ = nullptr;

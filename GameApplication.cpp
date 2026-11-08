@@ -68,6 +68,7 @@ void GameApplication::Initialize()
 	sprite_->Initialize(&dxCommon_);
 	debugCamera_.Initialize();
 	InitializeImGui();
+	frameTimer_.Initialize();
 	initialized_ = true;
 }
 
@@ -83,6 +84,7 @@ void GameApplication::Run()
 {
 	while (winApp_.ProcessMessage())
 	{
+		const float deltaTimeSeconds = frameTimer_.Tick();
 		// 1フレーム分のUIとDirectX描画コマンドを積む。
 		BeginImGuiFrame();
 		dxCommon_.BeginFrame();
@@ -94,6 +96,9 @@ void GameApplication::Run()
 		ImGui::SetNextWindowPos(ImVec2(750.0f, 74.0f), ImGuiCond_FirstUseEver);
 		ImGui::SetNextWindowSize(ImVec2(350.0f, 0.0f), ImGuiCond_FirstUseEver);
 		ImGui::Begin("Settings");
+		const float fps = ImGui::GetIO().Framerate;
+		ImGui::Text("FPS: %.1f (%.2f ms/frame)", fps, fps > 0.0f ? 1000.0f / fps : 0.0f);
+		ImGui::Separator();
 		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen))
 		{
 			ImGui::Checkbox("Debug Camera Active", &isDebugCameraActive_);
@@ -124,7 +129,7 @@ void GameApplication::Run()
 		if (isDebugCameraActive_)
 		{
 			// デバッグカメラがONのとき
-			debugCamera_.Update(&input_);
+			debugCamera_.Update(&input_, deltaTimeSeconds);
 			viewProjection = debugCamera_.GetViewProjectionMatrix();
 		}
 		else 
