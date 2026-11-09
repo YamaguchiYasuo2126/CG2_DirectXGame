@@ -223,8 +223,8 @@ void Object3d::CreatePipelineState() {
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
 	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
 
-	vertexShaderBlob_ = shaderCompiler_->Compile(L"Object3D.VS.hlsl", L"vs_6_0");
-	pixelShaderBlob_ = shaderCompiler_->Compile(L"Object3D.PS.hlsl", L"ps_6_0");
+	vertexShaderBlob_ = shaderCompiler_->Compile(L"resources/shaders/Object3D.VS.hlsl", L"vs_6_0");
+	pixelShaderBlob_ = shaderCompiler_->Compile(L"resources/shaders/Object3D.PS.hlsl", L"ps_6_0");
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC pipelineDesc{};
 	pipelineDesc.pRootSignature = rootSignature_.Get();
