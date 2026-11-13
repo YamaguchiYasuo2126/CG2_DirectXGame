@@ -20,6 +20,8 @@
 #include "DirectionalLight.h"
 #include "ModelData.h"
 #include "ModelLoader.h"
+#include "WeatherConditions.h"
+#include "EffectSettings.h"
 
 class DirectXCommon;
 class Logger;
@@ -30,16 +32,39 @@ struct ParticleData
 {
 	Transform transform;
 	Vector3 velocity;
+	Vector3 angularVelocity;
 	Vector4 color;
 	float lifeTime;
 	float currentTime;
+	uint64_t groupId = 0;
+	float baseHeight = 0.0f;
+	float flutterPhase = 0.0f;
+	Vector3 orbitCenter{};
+	float orbitRadius = 0.0f;
+	float orbitSpeed = 0.0f;
+	bool released = false;
 };
 
 struct ParticleForGPU
 {
 	Matrix4x4 WVP;
 	Matrix4x4 World;
+	Matrix4x4 WorldInverseTranspose;
 	Vector4 color;
+};
+
+enum class ParticleEffectType
+{
+	Debris,
+	Confetti,
+	Leaf,
+	Fire,
+	Smoke,
+	ElectricBarrier,
+	ElectricSpark,
+	ElectricFlash,
+	MagnetShards,
+	MagnetCore,
 };
 
 // 描画や更新を担当するパーティクルクラス
@@ -51,16 +76,38 @@ public:
 		DirectXCommon* dxCommon,
 		ShaderCompiler* shaderCompiler,
 		Logger* logger,
-		const std::string& modelName = "plane.obj",
-		const std::string& objectName = "Plane",
-		const std::string& modelDirectory = "resources");
+		const std::string& modelName = "quad",
+		const std::string& objectName = "Particle",
+		const std::string& modelDirectory = "resources",
+		const Vector3& modelScale = { 1.0f, 1.0f, 1.0f },
+		ParticleEffectType effectType = ParticleEffectType::Debris);
 
 	void Finalize();
-	void Update(bool moveParticles);
+	void Update(float deltaTime, const WeatherConditions& weather = {},
+		const Vector3& cameraPosition = {}, float drawDistance = 0.0f,
+		uint64_t activeLeafGroup = 0);
 	void Draw();
 	void DrawImGui();
+	void EmitBurst(const Vector3& center, uint32_t count,
+		const Vector3& emissionDirection = { 0.0f, 0.0f, -1.0f });
+	void EmitLeafPile(const Vector3& center, uint64_t groupId, uint32_t count);
+	void EmitFire(const Vector3& center, uint64_t groupId, uint32_t count);
+	void ExtinguishFire(uint64_t groupId);
+	void EmitSmoke(const Vector3& center, uint32_t count);
+	void EmitElectricBarrier(const Vector3& center, uint64_t groupId);
+	void RemoveElectricBarrier(uint64_t groupId);
+	void EmitElectricBurst(const Vector3& center, uint32_t count);
+	void EmitElectricFlash(const Vector3& center);
+	void EmitMagnetVortex(const Vector3& center, uint64_t groupId, uint32_t count);
+	void ReleaseMagnetGroup(uint64_t groupId);
+	void RemoveMagnetGroup(uint64_t groupId);
+	void EmitMagnetCore(const Vector3& center, uint64_t groupId);
+	void RemoveMagnetCore(uint64_t groupId);
+	uint32_t CountLeavesInPath(uint64_t groupId, const Vector3& center) const;
+	void RemoveLeafGroup(uint64_t groupId);
 
 	void SetViewProjectionMatrix(const Matrix4x4& viewProjection) { viewProjection_ = viewProjection; }
+	void SetEffectSettings(const EffectSettings* settings) { effectSettings_ = settings; }
 
 private:
 	// 描画に必要なDirectXリソースを用途ごとに作成。
@@ -75,7 +122,16 @@ private:
 	// バッファとSRVを作る関数
 	void CreateInstancingResource();
 	// 生成関数
-	ParticleData MakeNewParticle(std::mt19937& randomEngine);
+	ParticleData MakeNewParticle(std::mt19937& randomEngine, const Vector3& center,
+		const Vector3& emissionDirection);
+	ParticleData MakeNewLeaf(std::mt19937& randomEngine, const Vector3& center, uint64_t groupId);
+	ParticleData MakeNewFire(std::mt19937& randomEngine, const Vector3& center, uint64_t groupId);
+	ParticleData MakeNewSmoke(std::mt19937& randomEngine, const Vector3& center);
+	ParticleData MakeNewElectricBarrier(const Vector3& center, uint64_t groupId);
+	ParticleData MakeNewElectricSpark(std::mt19937& randomEngine, const Vector3& center);
+	ParticleData MakeNewElectricFlash(const Vector3& center);
+	ParticleData MakeNewMagnetShard(std::mt19937& randomEngine, const Vector3& center, uint64_t groupId);
+	ParticleData MakeNewMagnetCore(const Vector3& center, uint64_t groupId);
 
 	struct MeshGpuResource
 	{
@@ -111,11 +167,11 @@ private:
 	// 粒の生成に使う乱数エンジンを一度だけ初期化する
 	std::mt19937 randomEngine_{ std::random_device{}() };
 
-	// バッファに確保できるパーティクルの最大数
-	static constexpr uint32_t kMaxInstanceCount = 10;
+	// 複数の障害物の粒を同時に保持できる数
+	static constexpr uint32_t kMaxInstanceCount = 256;
 
 	// 生存中のパーティクルの数
-	uint32_t instanceCount_ = kMaxInstanceCount;
+	uint32_t instanceCount_ = 0;
 	// パーティクルのメンバ変数
 	std::array<ParticleData, kMaxInstanceCount> particles_{};
 
@@ -126,10 +182,13 @@ private:
 
 	// モデルディレクトリ
 	std::string modelDirectory_ = "resources";
+	Vector3 modelScale_{ 1.0f, 1.0f, 1.0f };
+	ParticleEffectType effectType_ = ParticleEffectType::Debris;
+	const EffectSettings* effectSettings_ = nullptr;
 
-	// テクスチャリソースとSRVハンドルを2つ持つように配列化
-	std::string modelName_ = "plane.obj";
-	std::string objectName_ = "Plane";
+	// 描画するモデルとUI表示名
+	std::string modelName_ = "quad";
+	std::string objectName_ = "Particle";
 
 	// 切り替え用のbool変数を用意する
 	bool useMonsterBall_ = true;

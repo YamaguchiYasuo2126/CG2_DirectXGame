@@ -148,20 +148,4 @@ void Sprite::Finalize()
 
 void Sprite::DrawImGui()
 {
-#ifdef USE_IMGUI
-    ImGui::Begin("Settings");
-
-    if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen)) {
-
-    // transformSprite_ の translate (平行移動) の X, Y, Z をいじれるようにする
-        ImGui::DragFloat3("Sprite Translate", &transformSprite_.translate.x, 1.0f);
-
-    // UVTransformのパラメータ編集用
-        ImGui::DragFloat2("UV Translate", &uvTransformSprite_.translate.x, 0.01f, -10.0f, 10.0f);
-        ImGui::DragFloat2("UV Scale", &uvTransformSprite_.scale.x, 0.01f, -10.0f, 10.0f);
-        ImGui::SliderAngle("UV Rotate", &uvTransformSprite_.rotate.z);
-    }
-
-    ImGui::End();
-#endif
 }

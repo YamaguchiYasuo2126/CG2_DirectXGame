@@ -36,6 +36,9 @@
     <ClCompile Include="GameApplication.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="EffectSettings.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
     <ClCompile Include="Logger.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -87,9 +90,15 @@
     <ClCompile Include="Particle.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="WeatherSystem.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ConvertString.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="EffectSettings.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="Matrix4x4.h">
@@ -197,12 +206,31 @@
     <ClInclude Include="Particle.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="WeatherSystem.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="WeatherConditions.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Object3d.VS.hlsl" />
     <FxCompile Include="Object3d.PS.hlsl" />
+    <FxCompile Include="Particle.ElectricBarrier.PS.hlsl" />
+    <FxCompile Include="Particle.ElectricFlash.PS.hlsl" />
+    <FxCompile Include="Particle.ElectricSpark.PS.hlsl" />
+    <FxCompile Include="Particle.Fire.PS.hlsl" />
+    <FxCompile Include="Particle.Leaf.PS.hlsl" />
+    <FxCompile Include="Particle.MagnetCore.PS.hlsl" />
     <FxCompile Include="Particle.PS.hlsl" />
+    <FxCompile Include="Particle.Smoke.PS.hlsl" />
     <FxCompile Include="Particle.VS.hlsl" />
+    <FxCompile Include="Weather.PS.hlsl" />
+    <FxCompile Include="Weather.Snow.PS.hlsl" />
+    <FxCompile Include="Weather.SandHaze.PS.hlsl" />
+    <FxCompile Include="Weather.SandHaze.VS.hlsl" />
+    <FxCompile Include="Weather.Sand.PS.hlsl" />
+    <FxCompile Include="Weather.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt">

@@ -58,6 +58,12 @@ DirectX::ScratchImage LoadTexture(const std::string& filePath) {
 	HRESULT hr = DirectX::LoadFromWICFile(filePathW.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
 	assert(SUCCEEDED(hr));
 
+	// 1x1テクスチャは縮小先のMipLevelが存在しない。
+	const DirectX::TexMetadata& metadata = image.GetMetadata();
+	if (metadata.width == 1 && metadata.height == 1) {
+		return image;
+	}
+
 	// 遠くに表示した時のちらつきを抑えるため、MipMapを生成します。
 	DirectX::ScratchImage mipImages{};
 	hr = DirectX::GenerateMipMaps(image.GetImages(), image.GetImageCount(), image.GetMetadata(), DirectX::TEX_FILTER_SRGB, 0, mipImages);

@@ -25,12 +25,15 @@ PixelShaderOutput main(VertexShaderOutput input)
     float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
     float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
     
-    output.color = gMaterial.color * textureColor * input.color;
-
-    if (output.color.a == 0.0f)
+    if (textureColor.a <= 0.5f)
     {
         discard;
     }
+
+    const float3 lightDirection = normalize(float3(0.35f, 0.8f, -0.45f));
+    const float diffuse = saturate(dot(normalize(input.normal), lightDirection));
+    const float brightness = gMaterial.lightingMode == 0 ? 1.0f : 0.3f + 0.7f * diffuse;
+    output.color = float4(gMaterial.color.rgb * textureColor.rgb * input.color.rgb * brightness, 1.0f);
     
     return output;
 }

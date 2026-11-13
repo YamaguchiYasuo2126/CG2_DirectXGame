@@ -34,14 +34,16 @@ public:
 		Logger* logger,
 		const std::string& modelName = "plane.obj",
 		const std::string& objectName = "Plane",
-		const std::string& modelDirectory = "resources");
+		const std::string& modelDirectory = "resources",
+		bool enableBlend = true);
 
 	void Finalize();
 	void Update();
-	void Draw();
+	void Draw(D3D12_GPU_VIRTUAL_ADDRESS transformationAddress = 0);
 	void DrawImGui();
 
 	void SetViewProjectionMatrix(const Matrix4x4& viewProjection) { viewProjection_ = viewProjection; }
+	void SetTransform(const Transform& transform) { transform_ = transform; }
 
 private:
 	// 描画に必要なDirectXリソースを用途ごとに作成
@@ -98,6 +100,7 @@ private:
 	// テクスチャリソースとSRVハンドルを2つ持つように配列化
 	std::string modelName_ = "plane.obj";
 	std::string objectName_ = "Plane";
+	bool enableBlend_ = true;
 
 	// 切り替え用のbool変数を用意する
 	bool useMonsterBall_ = true;

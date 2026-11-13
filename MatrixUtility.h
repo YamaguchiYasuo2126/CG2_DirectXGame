@@ -15,6 +15,7 @@ public:
 
 	// 逆行列
 	static Matrix4x4 Inverse(const Matrix4x4& m);
+	static Matrix4x4 Transpose(const Matrix4x4& m);
 
 	// 平行移動行列の作成
 	static Matrix4x4 MakeTranslateMatrix(const Vector3& translate);

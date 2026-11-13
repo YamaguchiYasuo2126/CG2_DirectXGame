@@ -20,7 +20,7 @@ void WinApp::Initialize() {
 	// 実際のWindowを作成して表示します。
 	hwnd_ = CreateWindow(
 		windowClass_.lpszClassName,
-		L"CG",
+		L"LE2C_31_ヤマグチ_ヤスオ",
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,

@@ -15,13 +15,14 @@
 
 void Object3d::Initialize(DirectXCommon* dxCommon, ShaderCompiler* shaderCompiler,
 	Logger* logger, const std::string& modelName, const std::string& objectName, 
-	const std::string& modelDirectory) {
+	const std::string& modelDirectory, bool enableBlend) {
 	dxCommon_ = dxCommon;
 	shaderCompiler_ = shaderCompiler;
 	logger_ = logger;
 	modelName_ = modelName;
 	objectName_ = objectName;
 	modelDirectory_ = modelDirectory;
+	enableBlend_ = enableBlend;
 
 
 	if (modelName_ == "sphere") {
@@ -81,12 +82,13 @@ void Object3d::Update() {
 	}
 }
 
-void Object3d::Draw() {
+void Object3d::Draw(D3D12_GPU_VIRTUAL_ADDRESS transformationAddress) {
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
 	commandList->SetGraphicsRootSignature(rootSignature_.Get());
 	commandList->SetPipelineState(graphicsPipelineState_.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	commandList->SetGraphicsRootConstantBufferView(1, wvpResource_->GetGPUVirtualAddress());
+	commandList->SetGraphicsRootConstantBufferView(1,
+		transformationAddress != 0 ? transformationAddress : wvpResource_->GetGPUVirtualAddress());
 	commandList->SetGraphicsRootConstantBufferView(3, directionalLightResource_->GetGPUVirtualAddress());
 
 	for (uint32_t meshIndex = 0; meshIndex < modelData_.meshes.size(); ++meshIndex) {
@@ -102,55 +104,9 @@ void Object3d::Draw() {
 	}
 }
 
-void Object3d::DrawImGui() {
-#ifdef USE_IMGUI
-	ImGui::Begin("Settings");
-	ImGui::PushID(objectName_.c_str());
-	if (ImGui::CollapsingHeader(objectName_.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::DragFloat3("Translate", &transform_.translate.x, 0.01f);
-		ImGui::DragFloat3("Rotate (rad)", &transform_.rotate.x, 0.01f);
-		ImGui::DragFloat3("Scale", &transform_.scale.x, 0.01f, 0.01f, 100.0f);
+void Object3d::DrawImGui()
+{
 
-		if (ImGui::TreeNode("Materials")) {
-			static constexpr const char* kLightingModeNames[] = { "Lighting None", "Lambert", "Half Lambert" };
-			for (uint32_t materialIndex = 0; materialIndex < materialResources_.size(); ++materialIndex) {
-				MaterialGpuResource& material = materialResources_[materialIndex];
-				const std::string& materialName = modelData_.materials[materialIndex].name;
-				ImGui::PushID(static_cast<int>(materialIndex));
-				if (ImGui::TreeNode(materialName.empty() ? "Material" : materialName.c_str())) {
-					int lightingMode = material.materialData->lightingMode;
-					if (ImGui::Combo("Lighting", &lightingMode, kLightingModeNames, IM_ARRAYSIZE(kLightingModeNames))) {
-						material.materialData->lightingMode = lightingMode;
-					}
-					ImGui::ColorEdit4("Color", &material.materialData->color.x);
-					ImGui::DragFloat2("UV Translate", &material.uvTransform.translate.x, 0.01f);
-					ImGui::DragFloat2("UV Scale", &material.uvTransform.scale.x, 0.01f, 0.01f, 100.0f);
-					ImGui::SliderAngle("UV Rotate", &material.uvTransform.rotate.z);
-					ImGui::TreePop();
-				}
-				ImGui::PopID();
-			}
-			ImGui::TreePop();
-		}
-	}
-
-	if (ImGui::CollapsingHeader("Light")) {
-		ImGui::ColorEdit4("Color", &directionalLightData_->color.x);
-		ImGui::DragFloat3("Direction", &directionalLightData_->direction.x, 0.01f, -1.0f, 1.0f);
-		const float length = std::sqrt(
-			directionalLightData_->direction.x * directionalLightData_->direction.x +
-			directionalLightData_->direction.y * directionalLightData_->direction.y +
-			directionalLightData_->direction.z * directionalLightData_->direction.z);
-		if (length > 0.0f) {
-			directionalLightData_->direction.x /= length;
-			directionalLightData_->direction.y /= length;
-			directionalLightData_->direction.z /= length;
-		}
-		ImGui::DragFloat("Intensity", &directionalLightData_->intensity, 0.01f);
-	}
-	ImGui::PopID();
-	ImGui::End();
-#endif
 }
 
 void Object3d::CreateRootSignature() {
@@ -208,13 +164,13 @@ void Object3d::CreatePipelineState() {
 	inputElements[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 	D3D12_INPUT_LAYOUT_DESC inputLayout{ inputElements, _countof(inputElements) };
 
-	// ノーマルブレンド用の設定
+	// ブロックのような不透明モデルはブレンドを無効にする。
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
-	blendDesc.RenderTarget[0].BlendEnable = TRUE;
-	blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+	blendDesc.RenderTarget[0].BlendEnable = enableBlend_ ? TRUE : FALSE;
+	blendDesc.RenderTarget[0].SrcBlend = enableBlend_ ? D3D12_BLEND_SRC_ALPHA : D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
+	blendDesc.RenderTarget[0].DestBlend = enableBlend_ ? D3D12_BLEND_ONE : D3D12_BLEND_ZERO;
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
 	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
