@@ -1,0 +1,73 @@
+#include "Input.h"
+#include <cassert>
+
+// .libのリンク設定
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+
+void Input::Initialize(WinApp* winApp)
+{
+    assert(winApp != nullptr);
+    winApp_ = winApp;
+
+    HRESULT hr = DirectInput8Create(winApp_->GetHInstance(), DIRECTINPUT_VERSION, IID_IDirectInput8, (void**)&directInput_, nullptr);
+    assert(SUCCEEDED(hr));
+
+    // キーボードデバイスの生成
+    hr = directInput_->CreateDevice(GUID_SysKeyboard, &keyboard_, NULL);
+    assert(SUCCEEDED(hr));
+
+    // 入力データ形式のセット
+    hr = keyboard_->SetDataFormat(&c_dfDIKeyboard);
+    assert(SUCCEEDED(hr));
+
+    // 排他制御レベルのセット
+    hr = keyboard_->SetCooperativeLevel(winApp_->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
+    assert(SUCCEEDED(hr));
+}
+
+void Input::Update()
+{
+    // 今のキー状態を、前のキー状態として保存しておく
+    memcpy(keyPre_, key_, sizeof(key_));
+
+    // キーボード情報の取得開始
+    keyboard_->Acquire();
+
+    // 全キーの入力状態を取得する
+    keyboard_->GetDeviceState(sizeof(key_), key_);
+}
+
+void Input::Finalize()
+{
+    if (keyboard_.Get() != nullptr)
+    {
+        keyboard_->Unacquire();
+    }
+
+    keyboard_.Reset();
+    directInput_.Reset();
+    winApp_ = nullptr;
+}
+
+// 押しているか（今のフレームで0x80ならtrue）
+bool Input::PushKey(uint8_t keyNum)
+{
+    if (key_[keyNum] == 0x80)
+    {
+        return true;
+    }
+
+    return false;
+}
+
+// 押した瞬間か（前のフレームで0x00かつ今のフレームで0x80ならtrue）
+bool Input::TriggerKey(uint8_t keyNum)
+{
+    if (keyPre_[keyNum] == 0x00 && key_[keyNum] == 0x80)
+    {
+        return true;
+    }
+
+    return false;
+}
