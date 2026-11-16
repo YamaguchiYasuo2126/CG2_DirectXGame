@@ -7,6 +7,8 @@
 #include <dxgi1_6.h>
 #include <wrl.h>
 
+#include "FrameRateLimiter.h"
+
 class Logger;
 
 // DirectX 12の初期化、フレーム開始/終了、共通Descriptorを担当する
@@ -81,6 +83,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
 	uint64_t fenceValue_ = 0;
 	HANDLE fenceEvent_ = nullptr;
+	FrameRateLimiter frameRateLimiter_;
 	D3D12_VIEWPORT viewport_{};
 	D3D12_RECT scissorRect_{};
 };

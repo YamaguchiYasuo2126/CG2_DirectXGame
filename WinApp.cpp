@@ -1,5 +1,9 @@
 #include "WinApp.h"
 
+#include <mmsystem.h>
+
+#pragma comment(lib, "winmm.lib")
+
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui_impl_win32.h"
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -7,6 +11,9 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 
 void WinApp::Initialize()
 {
+	// 短いスリープの待機精度を上げるため、1msのタイマー分解能を要求します。
+	timerResolutionRaised_ = timeBeginPeriod(1) == TIMERR_NOERROR;
+
 	// COMを利用するDirectX関連APIのために、アプリ全体で一度だけ初期化します。
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
@@ -45,6 +52,11 @@ void WinApp::Finalize()
 		DestroyWindow(hwnd_);
 	}
 	hwnd_ = nullptr;
+	if (timerResolutionRaised_)
+	{
+		timeEndPeriod(1);
+		timerResolutionRaised_ = false;
+	}
 	CoUninitialize();
 }
 

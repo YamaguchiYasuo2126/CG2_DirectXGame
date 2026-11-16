@@ -14,6 +14,7 @@
 #pragma comment(lib, "dxguid.lib")
 
 void DirectXCommon::Initialize(HWND hwnd, int32_t width, int32_t height, Logger* logger) {
+	frameRateLimiter_.Initialize();
 	logger_ = logger;
 	width_ = width;
 	height_ = height;
@@ -118,6 +119,7 @@ void DirectXCommon::EndFrame() {
 	swapChain_->Present(1, 0);
 	// 次フレームで同じリソースを安全に使えるよう、GPU処理の完了を待ちます。
 	WaitForGpu();
+	frameRateLimiter_.Wait();
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DirectXCommon::GetSrvCpuHandle(uint32_t index) const {

@@ -23,4 +23,5 @@ private:
 
 	WNDCLASS windowClass_{};
 	HWND hwnd_ = nullptr;
+	bool timerResolutionRaised_ = false;
 };
