@@ -1,0 +1,1 @@
+[![DebugBuild](https://github.com/YamaguchiYasuo2126/CG2_DirectXGame/actions/workflows/DebugBuild.yml/badge.svg)](https://github.com/YamaguchiYasuo2126/CG2_DirectXGame/actions/workflows/DebugBuild.yml)
