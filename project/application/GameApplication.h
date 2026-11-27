@@ -6,6 +6,7 @@
 #include "ShaderCompiler.h"
 #include "WinApp.h"
 #include "Sprite.h"
+#include "SpriteRenderer.h"
 #include "Input.h"
 #include "DebugCamera.h"
 #include "FrameTimer.h"
@@ -124,6 +125,7 @@ private:
 	Object3d multiMesh3d_;
 	Object3d multiMaterial3d_;
 	Object3d fence3d_;
+	SpriteRenderer spriteRenderer_; // 全スプライトで共有する描画設定を一つだけ所有。
 	Sprite sprite_;
 	// 演出の種類ごとに独立した粒プールと描画設定を持つ。
 	Particle particle_;

@@ -90,7 +90,8 @@ void GameApplication::Initialize()
 	fence3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_,"fence.obj", "Fence", "resources/fence");
 	multiMesh3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMesh.obj", "Multi Mesh");
 	multiMaterial3d_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "multiMaterial.obj", "Multi Material");
-	sprite_.Initialize(&dxCommon_);
+	spriteRenderer_.Initialize(&dxCommon_, &shaderCompiler_);
+	sprite_.Initialize(&spriteRenderer_);
 	particle_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "boxEffectGrain.obj", "Box Shards", "resources/boxEffectGrain");
 	// 元の板モデルは厚みが約0.005なので、奥行きだけ拡大する。
 	boardParticles_.Initialize(&dxCommon_, &shaderCompiler_, &logger_, "squareBoardEffectGrain.obj", "Board Shards", "resources/squareBoardEffectGrain", { 1.0f, 1.0f, 40.0f });
@@ -497,6 +498,8 @@ void GameApplication::Run()
 		fence3d_.Update();
 		multiMesh3d_.Update();
 		multiMaterial3d_.Update();
+		// ImGuiの入力を先に受け取り、変更した座標・角度を同じフレームへ反映する。
+		sprite_.DrawImGui();
 		sprite_.Update();
 		particle_.Update(deltaTime);
 		boardParticles_.Update(deltaTime);
@@ -543,7 +546,6 @@ void GameApplication::Run()
 			kObstacleDrawDistance);
 
 		// ImGuiのUI更新
-		sprite_.DrawImGui();
 		object3d_.DrawImGui();
 		sphere3d_.DrawImGui();
 		teapot3d_.DrawImGui();
@@ -584,8 +586,7 @@ void GameApplication::Run()
 		teapot3d_.Draw();
 		bunny3d_.Draw();
 		multiMesh3d_.Draw();
-		multiMaterial3d_.Draw();
-		sprite_.Draw();*/
+		multiMaterial3d_.Draw();*/
 		//fence3d_.Draw();
 		// 不透明なブロックの後に、立体の破片を描画する。
 		particle_.Draw();
@@ -600,6 +601,10 @@ void GameApplication::Run()
 		electricFlashParticles_.Draw();
 		magnetCoreParticles_.Draw();
 		weather_.Draw();
+
+		// 3Dの描画状態に依存せず、Sprite群の直前で共有設定を一度だけ適用する。
+		spriteRenderer_.BeginDraw();
+		sprite_.Draw();
 
 		EndImGuiFrame();
 		dxCommon_.EndFrame();
@@ -636,6 +641,7 @@ void GameApplication::Finalize()
 	boardParticles_.Finalize();
 	particle_.Finalize();
 	sprite_.Finalize();
+	spriteRenderer_.Finalize();
 	multiMaterial3d_.Finalize();
 	multiMesh3d_.Finalize();
 	fence3d_.Finalize();

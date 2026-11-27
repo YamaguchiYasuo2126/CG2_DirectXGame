@@ -2,18 +2,23 @@
 #include "DirectXCommon.h"
 #include "DirectXResource.h"
 #include "MatrixUtility.h"
+#include "SpriteRenderer.h"
+
+#include <cassert>
 
 #ifdef USE_IMGUI
 #include "externals/imgui/imgui.h"
 #endif
 
-void Sprite::Initialize(DirectXCommon* dxCommon) {
-    dxCommon_ = dxCommon;
+void Sprite::Initialize(SpriteRenderer* spriteRenderer) {
+    assert(spriteRenderer != nullptr && spriteRenderer->GetDirectXCommon() != nullptr);
+    spriteRenderer_ = spriteRenderer;
+    DirectXCommon* dxCommon = spriteRenderer_->GetDirectXCommon();
 
 
     // 頂点バッファの作成とデータ書き込み
     // Sprite用の頂点リソースを作る（4頂点分）
-    vertexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(VertexData) * 4);
+    vertexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon->GetDevice(), sizeof(VertexData) * 4);
 
     // 頂点バッファビューを作成する
     vertexBufferViewSprite_.BufferLocation = vertexResourceSprite_->GetGPUVirtualAddress();
@@ -35,7 +40,7 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
     vertexDataSprite_[3].texcoord = { 1.0f, 0.0f };
 
     // Indexは6つ必要なので、要素数を6
-    indexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(uint32_t) * 6);
+    indexResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon->GetDevice(), sizeof(uint32_t) * 6);
 
     // IndexBufferView (IBV) の設定
     indexBufferViewSprite_.BufferLocation = indexResourceSprite_->GetGPUVirtualAddress();
@@ -57,7 +62,7 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 
     // TransformationMatrix（行列）バッファの作成
     // 行列1つ分のリソースを作る
-    transformationMatrixResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(TransformationMatrix));
+    transformationMatrixResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon->GetDevice(), sizeof(TransformationMatrix));
 
     // データを書き込むためにMapする
     transformationMatrixResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixDataSprite_));
@@ -67,7 +72,7 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
     transformationMatrixDataSprite_->World = MatrixUtility::MakeIdentity4x4();
 
     // Sprite用のマテリアルリソースを作る
-    materialResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon_->GetDevice(), sizeof(Material));
+    materialResourceSprite_ = DirectXResource::CreateBufferResource(dxCommon->GetDevice(), sizeof(Material));
 
     // データを書き込むためにMapする
     materialResourceSprite_->Map(0, nullptr, reinterpret_cast<void**>(&materialDataSprite_));
@@ -83,19 +88,24 @@ void Sprite::Initialize(DirectXCommon* dxCommon) {
 }
 
 void Sprite::Update() {
+    DirectXCommon* dxCommon = spriteRenderer_->GetDirectXCommon();
 
     // WVPMatrixを作って定数バッファに書き込む
 
-    //  ワールド行列（SpriteのTransformから作成）
-    Matrix4x4 worldMatrixSprite = MatrixUtility::MakeAffineMatrix(transformSprite_.scale, transformSprite_.rotate, transformSprite_.translate);
+    // 2Dの状態を行列生成用の3D Transformへ変換する。Z座標とX/Y回転は使わない。
+    const Transform transformSprite{
+        { 1.0f, 1.0f, 1.0f },
+        { 0.0f, 0.0f, rotation_ },
+        { position_.x, position_.y, 0.0f }
+    };
+    Matrix4x4 worldMatrixSprite = MatrixUtility::MakeAffineMatrix(transformSprite.scale, transformSprite.rotate, transformSprite.translate);
 
-    // ビュー行列（2Dなので単位行列でOK）
+    // ビュー行列（2Dなので単位行列）
     Matrix4x4 viewMatrixSprite = MatrixUtility::MakeIdentity4x4();
 
     // プロジェクション行列（平行投影）
-    // スクリーンショットの kClientWidth / kClientHeight は dxCommon_ から取得します
-    float clientWidth = float(dxCommon_->GetWidth());
-    float clientHeight = float(dxCommon_->GetHeight());
+    float clientWidth = float(dxCommon->GetWidth());
+    float clientHeight = float(dxCommon->GetHeight());
     Matrix4x4 projectionMatrixSprite = MatrixUtility::MakeOrthographicMatrix(0.0f, 0.0f, clientWidth, clientHeight, 0.0f, 100.0f);
 
     // WVP行列を合成 (World * View * Projection)
@@ -114,8 +124,9 @@ void Sprite::Update() {
 }
 
 void Sprite::Draw() {
+    DirectXCommon* dxCommon = spriteRenderer_->GetDirectXCommon();
     // コマンドリストを取得
-    ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+    ID3D12GraphicsCommandList* commandList = dxCommon->GetCommandList();
 
     // Spriteの描画（変更が必要なものだけ設定する）
     // 頂点バッファ(VBV)をSprite用のものに差し替え
@@ -131,7 +142,7 @@ void Sprite::Draw() {
     commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResourceSprite_->GetGPUVirtualAddress());
 
     // 明示的にuvCheckerのSRVをセットする
-    commandList->SetGraphicsRootDescriptorTable(2, dxCommon_->GetSrvGpuHandle(1));
+    commandList->SetGraphicsRootDescriptorTable(2, dxCommon->GetSrvGpuHandle(1));
 
     // インデックスを使う
     // (描画するインデックス数, インスタンス数, インデックスの開始位置, 頂点の開始位置, インスタンスの開始位置)
@@ -144,18 +155,38 @@ void Sprite::Finalize()
     indexResourceSprite_.Reset();
     transformationMatrixResourceSprite_.Reset();
     materialResourceSprite_.Reset();
+    vertexDataSprite_ = nullptr;
+    indexDataSprite_ = nullptr;
+    transformationMatrixDataSprite_ = nullptr;
+    materialDataSprite_ = nullptr;
+    spriteRenderer_ = nullptr;
 }
 
 void Sprite::DrawImGui()
 {
 #ifdef USE_IMGUI
     ImGui::Begin("Settings");
+    ImGui::PushID(this);
     if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::DragFloat3("Sprite Translate", &transformSprite_.translate.x, 1.0f);
+        // UIは一時コピーを編集し、公開setterを通してSpriteの状態を変更する。
+        Vector2 position = GetPosition();
+        if (ImGui::DragFloat2("Position (px)", &position.x, 1.0f)) {
+            SetPosition(position);
+        }
+        float rotation = GetRotation();
+        // ImGuiは度数で表示するが、受け渡すfloatはラジアンのまま。
+        if (ImGui::SliderAngle("Rotation", &rotation, -180.0f, 180.0f)) {
+            SetRotation(rotation);
+        }
+        if (ImGui::Button("Reset Transform")) {
+            SetPosition({ 0.0f, 0.0f });
+            SetRotation(0.0f);
+        }
         ImGui::DragFloat2("UV Translate", &uvTransformSprite_.translate.x, 0.01f, -10.0f, 10.0f);
         ImGui::DragFloat2("UV Scale", &uvTransformSprite_.scale.x, 0.01f, -10.0f, 10.0f);
         ImGui::SliderAngle("UV Rotate", &uvTransformSprite_.rotate.z);
     }
+    ImGui::PopID();
     ImGui::End();
 #endif
 }
