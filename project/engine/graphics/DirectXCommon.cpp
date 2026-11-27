@@ -115,6 +115,7 @@ void DirectXCommon::EndFrame() {
 
 	ID3D12CommandList* commandLists[] = { commandList_.Get() };
 	commandQueue_->ExecuteCommandLists(1, commandLists);
+	// 同期間隔1で表示する。これはモニターの垂直同期であり、60FPS固定の待機ではない。
 	swapChain_->Present(1, 0);
 	// 次フレームで同じリソースを安全に使えるよう、GPU処理の完了を待ちます。
 	WaitForGpu();

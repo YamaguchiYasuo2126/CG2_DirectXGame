@@ -7,7 +7,7 @@
 #include <format>
 
 void Logger::Initialize() {
-	// 実行ごとに別ファイルへ出せるよう、日時入りのログファイルを作ります。
+	// 実行ごとに別ファイルへ出せるよう、日時入りのログファイルを作る。
 	std::filesystem::create_directory("logs");
 
 	std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
@@ -20,14 +20,14 @@ void Logger::Initialize() {
 }
 
 void Logger::Finalize() {
-	// ログファイルを閉じて、書き込み内容を確定させます。
+	// ログファイルを閉じて、書き込み内容を確定させる。
 	if (logStream_.is_open()) {
 		logStream_.close();
 	}
 }
 
 void Logger::Log(const std::string& message) {
-	// ファイルとVisual Studioの出力ウィンドウの両方へ出力します。
+	// ファイルとVisual Studioの出力ウィンドウの両方へ出力する。
 	if (logStream_.is_open()) {
 		logStream_ << message << std::endl;
 	}

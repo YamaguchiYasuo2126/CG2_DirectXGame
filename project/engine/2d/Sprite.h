@@ -22,11 +22,12 @@ public:
     // 更新処理（行列の再計算など）
     void Update();
 
-    // 描画処理（VBVとTransformationMatrixのみセットして描画）
+    // 頂点・インデックス・定数バッファを設定する。使用するPSO等は呼び出し側で準備。
     void Draw();
 
     void DrawImGui();
 
+    // Map先への参照を解除し、スプライトが所有するバッファを解放する。
     void Finalize();
 
 private:

@@ -16,12 +16,14 @@ public:
 	/// <summary>
 	/// 更新処理
 	/// </summary>
+	// deltaTimeSecondsは秒。移動量・回転量に掛け、FPSによる操作速度の差を抑える。
 	void Update(Input* input, float deltaTimeSeconds);
 
 	// ゲッター関数
 	const Matrix4x4& GetMatView() const { return matView_; }
 	const Matrix4x4& GetMatProjection() const { return matProjection_; }
 	Matrix4x4 GetViewProjectionMatrix() const { return matViewProjection_; }
+	const Vector3& GetTranslation() const { return translation_; }
 
 private:
 	// X, Y, Z軸周りのローカル回転角

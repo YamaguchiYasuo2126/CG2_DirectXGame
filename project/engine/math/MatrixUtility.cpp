@@ -53,6 +53,19 @@ Matrix4x4 MatrixUtility::MakeIdentity4x4() {
 	return result;
 }
 
+Matrix4x4 MatrixUtility::Transpose(const Matrix4x4& m)
+{
+	Matrix4x4 result{};
+	for (int row = 0; row < 4; ++row)
+	{
+		for (int column = 0; column < 4; ++column)
+		{
+			result.m[row][column] = m.m[column][row];
+		}
+	}
+	return result;
+}
+
 // 逆行列
 Matrix4x4 MatrixUtility::Inverse(const Matrix4x4& m)
 {

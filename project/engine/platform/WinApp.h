@@ -10,8 +10,10 @@ public:
 	static constexpr int32_t kClientWidth = 1280;
 	static constexpr int32_t kClientHeight = 720;
 
+	// ウィンドウクラスを登録し、指定したクライアントサイズのウィンドウを表示する。
 	void Initialize();
 	void Finalize();
+	// メッセージを処理し、終了要求が来た場合はfalseを返す。
 	bool ProcessMessage();
 
 	HWND GetHwnd() const { return hwnd_; }

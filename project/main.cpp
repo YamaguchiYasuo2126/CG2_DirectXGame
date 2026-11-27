@@ -168,6 +168,7 @@ void SoundPlayWave(IXAudio2* xAudio2, const SoundData& soundData, IXAudio2Source
 
 struct BgmContext
 {
+	// GameApplicationへvoid*で渡す借用データ。Runが終わるまで参照先を生存させる。
 	IXAudio2* xAudio2 = nullptr;
 	const SoundData* soundData = nullptr;
 	IXAudio2SourceVoice* sourceVoice = nullptr;
@@ -204,6 +205,7 @@ int WINAPI WinMain(_In_ HINSTANCE, _In_opt_ HINSTANCE, _In_ LPSTR, _In_ int) {
 	hr = xAudio2->CreateMasteringVoice(&masterVoice);
 
 	BgmContext bgmContext = { xAudio2.Get(), &soundData1, nullptr };
+	// UI側はXAudio2の詳細を知らず、コールバックを通して再生・停止を要求する。
 	application.SetBgmControls(PlayBgm, StopBgm, &bgmContext);
 
 	application.Run();
