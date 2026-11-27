@@ -386,6 +386,7 @@ void Particle::Update(float deltaTime, const WeatherConditions& weather,
 			particle.transform.rotate.y += particle.angularVelocity.y * deltaTime;
 			particle.transform.rotate.z += particle.angularVelocity.z * deltaTime;
 		}
+		// 距離判定は物理更新の後で行う。画面外の粒も寿命や移動は進め続ける。
 		if ((effectType_ == ParticleEffectType::Leaf || effectType_ == ParticleEffectType::Fire ||
 			effectType_ == ParticleEffectType::Smoke || effectType_ == ParticleEffectType::ElectricBarrier ||
 			effectType_ == ParticleEffectType::ElectricSpark || effectType_ == ParticleEffectType::ElectricFlash ||
@@ -442,6 +443,8 @@ void Particle::Update(float deltaTime, const WeatherConditions& weather,
 			particle.transform.rotate,
 			particle.transform.translate);
 
+		// CPUプールの空きや非表示粒を飛ばし、GPU側は先頭から隙間なく詰める。
+		// 法線用には逆転置行列を使い、非一様スケールでも面との直交を保つ。
 		instancingData_[instanceCount_].World = world;
 		instancingData_[instanceCount_].WVP = MatrixUtility::Multiply(world, viewProjection_);
 		instancingData_[instanceCount_].WorldInverseTranspose = MatrixUtility::Transpose(MatrixUtility::Inverse(world));
@@ -629,6 +632,7 @@ void Particle::CreatePipelineState()
 	{
 		blendDesc.RenderTarget[0].BlendEnable = TRUE;
 		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		// 光る演出は背景へ明るさを足す加算合成にする。
 		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 		blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 		blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ONE;
@@ -637,6 +641,7 @@ void Particle::CreatePipelineState()
 	{
 		blendDesc.RenderTarget[0].BlendEnable = TRUE;
 		blendDesc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		// 煙は背景を透かしつつ色を重ねる通常のアルファ合成にする。
 		blendDesc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 		blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 		blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;

@@ -238,6 +238,7 @@ void GameApplication::Run()
 
 	while (winApp_.ProcessMessage())
 	{
+		// 秒単位の同じ時間差を、カメラ・演出・発生頻度の更新すべてへ渡す。
 		const float deltaTime = frameTimer_.Tick();
 
 		// 1フレーム分のUIとDirectX描画コマンドを積みます。
@@ -311,6 +312,7 @@ void GameApplication::Run()
 		if (!isDebugCameraActive_)
 		{
 			Obstacle& currentObstacle = obstacles_[currentObstacleIndex_];
+			// 障害物ごとに待つ条件を切り替える。演出の完了時だけインデックスを進める。
 			switch (demoState_)
 			{
 			case DemoState::ApproachingObstacle:
@@ -402,6 +404,7 @@ void GameApplication::Run()
 				break;
 			case DemoState::PlayingElectric:
 				electricEffectTime_ += deltaTime;
+				// 閾値を超えたかで判定し、フレームが閾値と一致しなくても各段階を一度ずつ発火。
 				if (electricBurstStage_ == 0 && electricEffectTime_ >= 0.14f)
 				{
 					electricSparkParticles_.EmitElectricBurst(
@@ -516,6 +519,7 @@ void GameApplication::Run()
 			{
 				continue;
 			}
+			// 発生数の小数部分を保持し、FPSにかかわらず秒あたりの炎の量を揃える。
 			obstacle.fireEmissionCredit += effectSettings_.fire.particlesPerSecond *
 				(1.0f - obstacle.fireWetness) * deltaTime;
 			const uint32_t count = static_cast<uint32_t>(obstacle.fireEmissionCredit);

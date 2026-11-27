@@ -13,6 +13,7 @@ class ShaderCompiler {
 public:
 	void Initialize(Logger* logger);
 	void Finalize();
+	// 実行時にmainをコンパイルする。profileはvs_6_0やps_6_0、includeは元ファイルの親を検索。
 	Microsoft::WRL::ComPtr<IDxcBlob> Compile(const std::wstring& filePath, const wchar_t* profile);
 
 private:

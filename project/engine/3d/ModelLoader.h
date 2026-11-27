@@ -6,7 +6,7 @@
 class ModelLoader 
 {
 public:
-    // Objファイルを読み込んでModelDataを返す関数
+    // directoryPath内のOBJ/MTLを読む。左手系へ変換し、多角形の面を三角形へ分割する。
     static ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
 
     // mtlファイルを読み込んでMaterialDataを返す関数

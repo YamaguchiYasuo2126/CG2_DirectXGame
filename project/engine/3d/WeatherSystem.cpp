@@ -196,6 +196,7 @@ void WeatherSystem::Update(float deltaTime, const Vector3& cameraPosition,
 
 	const float emissionRate = mode_ == Mode::Rain ? rainPerSecond_ :
 		(mode_ == Mode::Snow ? snowPerSecond_ : sandPerSecond_);
+	// 整数の発生数だけを使い、小数を残す。高FPSでも低い発生頻度を維持できる。
 	spawnCredit_ += emissionRate * deltaTime;
 	const uint32_t toSpawn = static_cast<uint32_t>(spawnCredit_);
 	spawnCredit_ -= static_cast<float>(toSpawn);
@@ -221,6 +222,7 @@ void WeatherSystem::Update(float deltaTime, const Vector3& cameraPosition,
 	std::uniform_real_distribution<float> phaseDistribution(0.0f, 6.2831853f);
 	uint32_t emitted = 0;
 	uint32_t scanned = 0;
+	// 循環カーソルから空きを探す。満杯でも配列1周で打ち切り、生存粒は上書きしない。
 	for (; scanned < kMaxParticles && emitted < toSpawn; ++scanned)
 	{
 		WeatherParticle& particle = particles_[(spawnCursor_ + scanned) % kMaxParticles];
@@ -242,6 +244,7 @@ void WeatherSystem::Update(float deltaTime, const Vector3& cameraPosition,
 	}
 	spawnCursor_ = (spawnCursor_ + scanned) % kMaxParticles;
 
+	// カメラの移動成分を除き、向きだけを雪・砂の板へ適用するビルボードを作る。
 	Matrix4x4 billboardRotation = cameraWorld;
 	billboardRotation.m[3][0] = 0.0f;
 	billboardRotation.m[3][1] = 0.0f;

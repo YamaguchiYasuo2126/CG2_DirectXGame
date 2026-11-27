@@ -16,6 +16,7 @@ public:
 	/// <summary>
 	/// 更新処理
 	/// </summary>
+	// deltaTimeSecondsは秒。移動量・回転量に掛け、FPSによる操作速度の差を抑える。
 	void Update(Input* input, float deltaTimeSeconds);
 
 	// ゲッター関数

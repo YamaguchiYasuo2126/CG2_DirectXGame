@@ -21,6 +21,7 @@ public:
     // 毎フレーム行う更新処理（キーボードの入力状態を取得するなど）
     void Update();
 
+    // キーボードの取得状態を解除してからDirectInputを解放する。
     void Finalize();
 
     /// <summary>
@@ -38,7 +39,7 @@ public:
     bool TriggerKey(uint8_t keyNum);
 
 private:
-    // WindowsAPI
+    // ウィンドウ情報は借用。InputのFinalizeが終わるまでWinAppを生存させる。
     WinApp* winApp_ = nullptr;
 
     // DirectInputのポインタをComPtrで管理
@@ -46,7 +47,7 @@ private:
     // キーボードデバイスのポインタをComPtrで管理
     ComPtr<IDirectInputDevice8> keyboard_;
 
-    // 全キーの入力状態を保存する配列（今フレームと前フレーム）
+    // DIK_*を添字に使う。前フレームとの比較で押した瞬間を検出する。
     BYTE key_[256] = {};
     BYTE keyPre_[256] = {};
 };

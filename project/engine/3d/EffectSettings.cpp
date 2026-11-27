@@ -168,6 +168,7 @@ bool LoadEffectSettings(const std::filesystem::path& path, EffectSettings& out, 
 	if (!fire || !electric || !magnet || !version || version->kind != JsonValue::Kind::Number || version->number != 1.0) {
 		error = "Missing effect section or unsupported version"; return false;
 	}
+	// 全項目を一時データへ検証してから反映し、不正なJSONで一部だけ更新されるのを防ぐ。
 	EffectSettings parsed;
 	if (!Number(*fire, "particlesPerSecond", 0.0, 160.0, parsed.fire.particlesPerSecond) ||
 		!Number(*fire, "sizeScale", 0.25, 3.0, parsed.fire.sizeScale) ||
@@ -195,10 +196,12 @@ bool SaveEffectSettings(const std::filesystem::path& path, const EffectSettings&
 	std::error_code filesystemError;
 	std::filesystem::create_directories(path.parent_path(), filesystemError);
 	if (filesystemError) { error = "Could not create preset directory"; return false; }
+	// 既存設定を直接切り詰めず、同じ場所の一時ファイルへ完成形を書き出す。
 	std::filesystem::path temporary = path;
 	temporary += L".tmp";
 	std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
 	if (!file) { error = "Could not write effect preset"; return false; }
+	// ロケールによる小数点の変化を防ぎ、JSONとして読める表記へ固定する。
 	file.imbue(std::locale::classic());
 	file << std::setprecision(8);
 	file << "{\n  \"version\": 1,\n  \"fire\": {\n"
@@ -228,6 +231,7 @@ bool SaveEffectSettings(const std::filesystem::path& path, const EffectSettings&
 	file << "\n  }\n}\n";
 	file.close();
 	if (!file) { error = "Could not finish writing effect preset"; std::filesystem::remove(temporary, filesystemError); return false; }
+	// closeまで成功した場合だけ置換する。置換失敗時も元の設定ファイルは保持する。
 	if (!MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
 		error = "Could not replace effect preset file";
 		std::filesystem::remove(temporary, filesystemError);

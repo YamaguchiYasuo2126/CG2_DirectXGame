@@ -31,20 +31,21 @@ class ShaderCompiler;
 struct ParticleData
 {
 	Transform transform;
-	Vector3 velocity;
-	Vector3 angularVelocity;
+	Vector3 velocity; // ワールド単位/秒。UpdateでdeltaTimeを掛けて位置へ加算。
+	Vector3 angularVelocity; // 各軸の回転速度。単位はラジアン/秒。
 	Vector4 color;
-	float lifeTime;
-	float currentTime;
-	uint64_t groupId = 0;
+	float lifeTime; // 寿命（秒）。currentTimeがこの値以上なら再利用可能。
+	float currentTime; // 発生からの経過秒数。
+	uint64_t groupId = 0; // 障害物単位で発生・除去するための識別子。
 	float baseHeight = 0.0f;
-	float flutterPhase = 0.0f;
+	float flutterPhase = 0.0f; // 揺らぎ、または磁力の公転角の位相（ラジアン）。
 	Vector3 orbitCenter{};
 	float orbitRadius = 0.0f;
 	float orbitSpeed = 0.0f;
-	bool released = false;
+	bool released = false; // 磁力の公転状態から、速度による飛散状態へ移行済みか。
 };
 
+// Particle.VS.hlslのStructuredBufferと同じ順序・レイアウトで転送する。
 struct ParticleForGPU
 {
 	Matrix4x4 WVP;
@@ -72,6 +73,7 @@ class Particle
 {
 public:
 
+	// 外部クラスは借用する。モデル、粒の種類に対応するPSO、固定長の粒プールを準備。
 	void Initialize(
 		DirectXCommon* dxCommon,
 		ShaderCompiler* shaderCompiler,
@@ -82,14 +84,18 @@ public:
 		const Vector3& modelScale = { 1.0f, 1.0f, 1.0f },
 		ParticleEffectType effectType = ParticleEffectType::Debris);
 
+	// Mapした領域とCOMリソースを解放する。借用した外部クラスは破棄しない。
 	void Finalize();
-	void Update(float deltaTime, const WeatherConditions& weather = {},
-		const Vector3& cameraPosition = {}, float drawDistance = 0.0f,
-		uint64_t activeLeafGroup = 0);
+	// deltaTimeは秒。drawDistanceが正の場合のみ対象演出を距離で間引く。
+	// activeLeafGroupは風を受ける落ち葉のグループで、他の落ち葉はその場に残す。
+	void Update(float deltaTime, const WeatherConditions& weather = {}, const Vector3& cameraPosition = {}, 
+		float drawDistance = 0.0f, uint64_t activeLeafGroup = 0);
+	// UpdateでGPU用に詰めた粒だけをインスタンシング描画する。
 	void Draw();
 	void DrawImGui();
-	void EmitBurst(const Vector3& center, uint32_t count,
-		const Vector3& emissionDirection = { 0.0f, 0.0f, -1.0f });
+	// 寿命切れのスロットへ生成する。空きが不足する場合は発生数がcount未満になる。
+	void EmitBurst(const Vector3& center, uint32_t count, const Vector3& emissionDirection = { 0.0f, 0.0f, -1.0f });
+	// グループ付き演出は、障害物の通過・消火時に対応する粒だけを操作できる。
 	void EmitLeafPile(const Vector3& center, uint64_t groupId, uint32_t count);
 	void EmitFire(const Vector3& center, uint64_t groupId, uint32_t count);
 	void ExtinguishFire(uint64_t groupId);
@@ -99,14 +105,17 @@ public:
 	void EmitElectricBurst(const Vector3& center, uint32_t count);
 	void EmitElectricFlash(const Vector3& center);
 	void EmitMagnetVortex(const Vector3& center, uint64_t groupId, uint32_t count);
+	// 公転中の破片へ中心から外向きの速度を与え、飛散する状態へ切り替える。
 	void ReleaseMagnetGroup(uint64_t groupId);
 	void RemoveMagnetGroup(uint64_t groupId);
 	void EmitMagnetCore(const Vector3& center, uint64_t groupId);
 	void RemoveMagnetCore(uint64_t groupId);
+	// 通り道に残る落ち葉だけを数え、風で道が開けたかの判定に使う。
 	uint32_t CountLeavesInPath(uint64_t groupId, const Vector3& center) const;
 	void RemoveLeafGroup(uint64_t groupId);
 
 	void SetViewProjectionMatrix(const Matrix4x4& viewProjection) { viewProjection_ = viewProjection; }
+	// 設定はコピーしない。参照先はこのParticleの利用中、有効である必要がある。
 	void SetEffectSettings(const EffectSettings* settings) { effectSettings_ = settings; }
 
 private:
@@ -122,8 +131,7 @@ private:
 	// バッファとSRVを作る関数
 	void CreateInstancingResource();
 	// 生成関数
-	ParticleData MakeNewParticle(std::mt19937& randomEngine, const Vector3& center,
-		const Vector3& emissionDirection);
+	ParticleData MakeNewParticle(std::mt19937& randomEngine, const Vector3& center, const Vector3& emissionDirection);
 	ParticleData MakeNewLeaf(std::mt19937& randomEngine, const Vector3& center, uint64_t groupId);
 	ParticleData MakeNewFire(std::mt19937& randomEngine, const Vector3& center, uint64_t groupId);
 	ParticleData MakeNewSmoke(std::mt19937& randomEngine, const Vector3& center);
@@ -170,13 +178,13 @@ private:
 	// 複数の障害物の粒を同時に保持できる数
 	static constexpr uint32_t kMaxInstanceCount = 256;
 
-	// 生存中のパーティクルの数
+	// 今フレームにGPUへ送る描画対象数。距離で除外された生存粒は含まない。
 	uint32_t instanceCount_ = 0;
-	// パーティクルのメンバ変数
+	// 固定長プール。寿命切れの要素を再利用し、発生ごとのメモリ確保を避ける。
 	std::array<ParticleData, kMaxInstanceCount> particles_{};
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource_;
-	ParticleForGPU* instancingData_ = nullptr;
+	ParticleForGPU* instancingData_ = nullptr; // Map先への借用ポインタ。resource側がメモリを所有。
 
 	D3D12_GPU_DESCRIPTOR_HANDLE instancingSrvHandleGPU_{};
 

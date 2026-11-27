@@ -28,6 +28,7 @@ class ShaderCompiler;
 class Object3d
 {
 public:
+	// モデルとマテリアルを読み込む。enableBlend=trueは現在の加算ブレンドを有効にする。
 	void Initialize(
 		DirectXCommon* dxCommon,
 		ShaderCompiler* shaderCompiler,
@@ -38,7 +39,9 @@ public:
 		bool enableBlend = true);
 
 	void Finalize();
+	// Transformからワールド/WVP行列を計算し、Map済みのGPU用データを更新する。
 	void Update();
+	// transformationAddress=0は自身の行列、非0は障害物ごとの外部行列を使用する。
 	void Draw(D3D12_GPU_VIRTUAL_ADDRESS transformationAddress = 0);
 	void DrawImGui();
 
@@ -69,6 +72,7 @@ private:
 		Transform uvTransform{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	};
 
+	// これらのサービスは借用し、所有・破棄はGameApplication側で行う。
 	DirectXCommon* dxCommon_ = nullptr;
 	ShaderCompiler* shaderCompiler_ = nullptr;
 	Logger* logger_ = nullptr;
@@ -86,18 +90,16 @@ private:
 	std::vector<MeshGpuResource> meshResources_;
 	std::vector<MaterialGpuResource> materialResources_;
 
-	// インデックスバッファ用の変数
-
 	// 平行光源用のリソースとデータポインタ
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
 	DirectionalLight* directionalLightData_ = nullptr;
 
-	TransformationMatrix* wvpData_ = nullptr;
+	TransformationMatrix* wvpData_ = nullptr; // wvpResource_のMap先。直接deleteしない。
 
 	// モデルディレクトリ
 	std::string modelDirectory_ = "resources";
 
-	// テクスチャリソースとSRVハンドルを2つ持つように配列化
+	// 読み込むモデル名と、ImGui内で識別する表示名。
 	std::string modelName_ = "plane.obj";
 	std::string objectName_ = "Plane";
 	bool enableBlend_ = true;
@@ -109,8 +111,6 @@ private:
 	// OBJ の Plane は +Z 側を表面としているため、起動時からカメラ側 (-Z) を向く
 	Transform transform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 3.14159265f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 	Transform cameraTransform_{ {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -10.0f} };
-
-	// UVTransform用の変数
 
 	// 読み込んだモデルデータを保持する変数
 	ModelData modelData_;
