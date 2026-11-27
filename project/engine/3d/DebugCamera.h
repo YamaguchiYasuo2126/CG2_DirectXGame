@@ -22,6 +22,7 @@ public:
 	const Matrix4x4& GetMatView() const { return matView_; }
 	const Matrix4x4& GetMatProjection() const { return matProjection_; }
 	Matrix4x4 GetViewProjectionMatrix() const { return matViewProjection_; }
+	const Vector3& GetTranslation() const { return translation_; }
 
 private:
 	// X, Y, Z軸周りのローカル回転角

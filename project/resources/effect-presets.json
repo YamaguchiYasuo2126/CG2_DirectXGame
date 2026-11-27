@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "fire": {
+    "particlesPerSecond": 42,
+    "sizeScale": 1,
+    "riseSpeedScale": 1,
+    "lifetimeScale": 1,
+    "tint": [1, 1, 1]
+  },
+  "electric": {
+    "firstSparkCount": 96,
+    "secondSparkCount": 64,
+    "finalSparkCount": 48,
+    "sizeScale": 1,
+    "speedScale": 1,
+    "lifetimeScale": 1,
+    "tint": [1, 1, 1]
+  },
+  "magnet": {
+    "shardCount": 32,
+    "sizeScale": 1,
+    "orbitRadiusScale": 1,
+    "orbitSpeedScale": 1,
+    "releaseSpeedScale": 1,
+    "tint": [1, 1, 1]
+  }
+}
